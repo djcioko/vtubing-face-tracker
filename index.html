@@ -44,6 +44,7 @@
       left: 0;
       width: 100%;
       height: 100%;
+      object-fit: cover;
       transform: scaleX(-1);
     }
 
@@ -213,14 +214,14 @@
     </div>
 
     <!-- Calibrare Gură -->
-    <div class="section-title">👄 CALIBRARE GURĂ DINAMICĂ</div>
+    <div class="section-title">👄 AJUSTARE FINĂ GURĂ</div>
     <div class="row">
-      <label>Pozitie Gură X (Stânga/Dreapta):</label>
+      <label>Fine-Tune Gură X:</label>
       <input type="range" id="mouthXSlider" min="-100" max="100" step="1" value="0">
     </div>
     <div class="row">
-      <label>Pozitie Gură Y (Sus/Jos):</label>
-      <input type="range" id="mouthYSlider" min="-100" max="100" step="1" value="25">
+      <label>Fine-Tune Gură Y:</label>
+      <input type="range" id="mouthYSlider" min="-100" max="100" step="1" value="0">
     </div>
     <div class="row">
       <label>Lățime Gură (Width):</label>
@@ -243,7 +244,6 @@
     canvasElement.width = 640;
     canvasElement.height = 480;
 
-    // Canvas temporar pentru AI Cut-off
     const segmentCanvas = document.createElement('canvas');
     segmentCanvas.width = 640;
     segmentCanvas.height = 480;
@@ -265,7 +265,7 @@
     const bgGallery = document.getElementById('bgGallery');
     const avatarGallery = document.getElementById('avatarGallery');
 
-    // Stări
+    // Stări & Smoothing State
     let showRealCam = false;
     let isAiCutOn = false;
     let latestSegmentationMask = null;
@@ -274,10 +274,13 @@
     let activeBg = null;
     let activeAvatar = null;
 
+    // Variabile pentru netezire mișcare (Smooth Interpolation)
+    let smoothX = 0, smoothY = 0, smoothAngle = 0, smoothEyeDist = 0;
+    const lerp = (start, end, amt) => (1 - amt) * start + amt * end;
+
     let savedBgs = JSON.parse(localStorage.getItem('vtuber_bgs') || '[]');
     let savedAvatars = JSON.parse(localStorage.getItem('vtuber_avatars') || '[]');
 
-    // Memorie Slidere Settings
     const sliders = [scaleSlider, offsetXSlider, offsetYSlider, mouthXSlider, mouthYSlider, mouthWidthSlider, mouthSensSlider];
     
     function saveSliderSettings() {
@@ -294,12 +297,10 @@
       });
     }
 
-    // Salvare & Randare Galerii
     function renderGalleries() {
       localStorage.setItem('vtuber_bgs', JSON.stringify(savedBgs));
       localStorage.setItem('vtuber_avatars', JSON.stringify(savedAvatars));
 
-      // Fundaluri
       bgGallery.innerHTML = '';
       savedBgs.forEach((src, idx) => {
         const item = document.createElement('div');
@@ -325,7 +326,6 @@
         bgGallery.appendChild(item);
       });
 
-      // Avatare
       avatarGallery.innerHTML = '';
       savedAvatars.forEach((src, idx) => {
         const item = document.createElement('div');
@@ -352,7 +352,6 @@
       });
     }
 
-    // Upload
     document.getElementById('bgLoader').addEventListener('change', (e) => {
       const file = e.target.files[0];
       if (file) {
@@ -381,7 +380,6 @@
       }
     });
 
-    // Toggle Buttons
     toggleShowCamBtn.addEventListener('click', () => {
       showRealCam = !showRealCam;
       toggleShowCamBtn.innerText = `Camera Reala: ${showRealCam ? 'ON' : 'OFF'}`;
@@ -412,12 +410,11 @@
       drawScene();
     });
 
-    // RENDER MAIN LOOP
     function drawScene() {
       statusEl.innerText = "Tracking Activ 🟢";
       canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
 
-      // 1. Desenează Fundalul Selectat
+      // 1. Fundal
       if (activeBg && activeBg.complete) {
         canvasCtx.drawImage(activeBg, 0, 0, canvasElement.width, canvasElement.height);
       } else {
@@ -425,28 +422,22 @@
         canvasCtx.fillRect(0, 0, canvasElement.width, canvasElement.height);
       }
 
-      // 2. Desenează Camera Reală (cu sau fără AI Cut-Off)
+      // 2. Camera Reală
       if (showRealCam) {
         if (isAiCutOn && latestSegmentationMask) {
           segmentCtx.clearRect(0, 0, segmentCanvas.width, segmentCanvas.height);
-          
-          // Desenează masca de segmentare
           segmentCtx.drawImage(latestSegmentationMask, 0, 0, segmentCanvas.width, segmentCanvas.height);
-          
-          // Păstrează doar omul
           segmentCtx.globalCompositeOperation = 'source-in';
           segmentCtx.drawImage(videoElement, 0, 0, segmentCanvas.width, segmentCanvas.height);
           segmentCtx.globalCompositeOperation = 'source-over';
 
-          // Aplică omul decupat pe canvasul principal
           canvasCtx.drawImage(segmentCanvas, 0, 0, canvasElement.width, canvasElement.height);
         } else {
-          // Camera full fără decupare
           canvasCtx.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
         }
       }
 
-      // 3. Desenează Avatarul / Masca + Gura Dinamică
+      // 3. Mască & Gură Dinamică cu Auto-Aliniere
       if (latestFaceResults && latestFaceResults.multiFaceLandmarks && latestFaceResults.multiFaceLandmarks.length > 0) {
         const landmarks = latestFaceResults.multiFaceLandmarks[0];
 
@@ -457,41 +448,53 @@
         const sens = parseFloat(mouthSensSlider.value);
         const jawOpenValue = Math.min(Math.max((jawDist - 0.015) * sens, 0), 1);
 
-        // Pozitie Cap
+        // Poziționare Cap
         const leftEye = landmarks[33];
         const rightEye = landmarks[263];
         const nose = landmarks[1];
 
         const dx = (rightEye.x - leftEye.x) * canvasElement.width;
         const dy = (rightEye.y - leftEye.y) * canvasElement.height;
-        const angle = Math.atan2(dy, dx);
-
-        const eyeDistance = Math.hypot(dx, dy);
-        const scale = parseFloat(scaleSlider.value);
-        const maskWidth = eyeDistance * scale;
-        const maskHeight = maskWidth;
+        const targetAngle = Math.atan2(dy, dx);
+        const targetEyeDist = Math.hypot(dx, dy);
 
         const offX = parseFloat(offsetXSlider.value);
         const offY = parseFloat(offsetYSlider.value);
-        const centerX = nose.x * canvasElement.width + offX;
-        const centerY = nose.y * canvasElement.height + offY;
+        const targetX = nose.x * canvasElement.width + offX;
+        const targetY = nose.y * canvasElement.height + offY;
+
+        // Filtru Netezire (Smoothing)
+        smoothX = lerp(smoothX || targetX, targetX, 0.3);
+        smoothY = lerp(smoothY || targetY, targetY, 0.3);
+        smoothAngle = lerp(smoothAngle || targetAngle, targetAngle, 0.3);
+        smoothEyeDist = lerp(smoothEyeDist || targetEyeDist, targetEyeDist, 0.3);
+
+        const scale = parseFloat(scaleSlider.value);
+        const maskWidth = smoothEyeDist * scale;
+        const maskHeight = maskWidth;
 
         if (activeAvatar && activeAvatar.complete) {
           canvasCtx.save();
-          canvasCtx.translate(centerX, centerY);
-          canvasCtx.rotate(angle);
+          canvasCtx.translate(smoothX, smoothY);
+          canvasCtx.rotate(smoothAngle);
 
           // Mască Avatar
           canvasCtx.drawImage(activeAvatar, -maskWidth / 2, -maskHeight / 2, maskWidth, maskHeight);
 
-          // Gura Dinamică Calibrată
-          const mX = parseFloat(mouthXSlider.value);
-          const mY = parseFloat(mouthYSlider.value);
+          // Calibrare Automată Gură bazată pe centrul real al buzelor
+          const lipCenterY = (lipTop.y + lipBottom.y) / 2;
+          const autoMouthY = (lipCenterY - nose.y) * canvasElement.height;
+
+          const fineX = parseFloat(mouthXSlider.value);
+          const fineY = parseFloat(mouthYSlider.value);
+          const finalMouthX = fineX;
+          const finalMouthY = autoMouthY + fineY;
+
           const mWidth = parseFloat(mouthWidthSlider.value);
           const mouthOpenH = Math.max(2, jawOpenValue * 25);
 
           canvasCtx.beginPath();
-          canvasCtx.ellipse(mX, mY, mWidth / 2, mouthOpenH / 2, 0, 0, Math.PI * 2);
+          canvasCtx.ellipse(finalMouthX, finalMouthY, mWidth / 2, mouthOpenH / 2, 0, 0, Math.PI * 2);
           canvasCtx.fillStyle = '#050811';
           canvasCtx.fill();
 
@@ -500,7 +503,6 @@
       }
     }
 
-    // Pornire Cameră & Loop
     const camera = new Camera(videoElement, {
       onFrame: async () => {
         if (isAiCutOn && showRealCam) {
