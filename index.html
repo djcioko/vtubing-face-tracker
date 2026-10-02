@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>VTuber Studio Custom - DJ Cioko</title>
+  <title>VTuber Studio v1.1 - Body & Face Tracking</title>
 
   <!-- MediaPipe CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
@@ -163,7 +163,7 @@
 </head>
 <body>
 
-  <h3>🎭 VTuber Studio Calibration App</h3>
+  <h3>🎭 VTuber Studio v1.1 - DJ Cioko</h3>
 
   <div class="canvas-container">
     <video id="webcam" playsinline style="display:none;"></video>
@@ -179,7 +179,7 @@
     </div>
 
     <!-- Galerie Fundaluri -->
-    <div class="section-title">🖼️ FUNDAL SCENĂ</div>
+    <div class="section-title">🖼️️ FUNDAL SCENĂ</div>
     <div class="btn-group">
       <label class="btn">
         ➕ Upload Fundal
@@ -232,7 +232,7 @@
       <input type="range" id="mouthSensSlider" min="1" max="30" step="1" value="15">
     </div>
 
-    <div id="status">Se încarcă modelele AI...</div>
+    <div id="status">Se încarcă modelele AI (v1.1)...</div>
   </div>
 
   <script>
@@ -249,7 +249,6 @@
     segmentCanvas.height = 480;
     const segmentCtx = segmentCanvas.getContext('2d');
 
-    // Controls
     const toggleShowCamBtn = document.getElementById('toggleShowCam');
     const toggleAiCutBtn = document.getElementById('toggleAiCut');
 
@@ -265,7 +264,6 @@
     const bgGallery = document.getElementById('bgGallery');
     const avatarGallery = document.getElementById('avatarGallery');
 
-    // Stări & Smoothing State
     let showRealCam = false;
     let isAiCutOn = false;
     let latestSegmentationMask = null;
@@ -274,7 +272,6 @@
     let activeBg = null;
     let activeAvatar = null;
 
-    // Variabile pentru netezire mișcare (Smooth Interpolation)
     let smoothX = 0, smoothY = 0, smoothAngle = 0, smoothEyeDist = 0;
     const lerp = (start, end, amt) => (1 - amt) * start + amt * end;
 
@@ -392,7 +389,6 @@
       toggleAiCutBtn.classList.toggle('active', isAiCutOn);
     });
 
-    // MediaPipe Setup
     const selfieSegmentation = new SelfieSegmentation({
       locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`
     });
@@ -411,10 +407,9 @@
     });
 
     function drawScene() {
-      statusEl.innerText = "Tracking Activ 🟢";
+      statusEl.innerText = "v1.1 Tracking Activ 🟢";
       canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
 
-      // 1. Fundal
       if (activeBg && activeBg.complete) {
         canvasCtx.drawImage(activeBg, 0, 0, canvasElement.width, canvasElement.height);
       } else {
@@ -422,11 +417,15 @@
         canvasCtx.fillRect(0, 0, canvasElement.width, canvasElement.height);
       }
 
-      // 2. Camera Reală
       if (showRealCam) {
         if (isAiCutOn && latestSegmentationMask) {
           segmentCtx.clearRect(0, 0, segmentCanvas.width, segmentCanvas.height);
+          
+          // Aplică Soft Blur pe margine pentru integrare AR
+          segmentCtx.filter = 'blur(4px)';
           segmentCtx.drawImage(latestSegmentationMask, 0, 0, segmentCanvas.width, segmentCanvas.height);
+          segmentCtx.filter = 'none';
+
           segmentCtx.globalCompositeOperation = 'source-in';
           segmentCtx.drawImage(videoElement, 0, 0, segmentCanvas.width, segmentCanvas.height);
           segmentCtx.globalCompositeOperation = 'source-over';
@@ -437,18 +436,15 @@
         }
       }
 
-      // 3. Mască & Gură Dinamică cu Auto-Aliniere
       if (latestFaceResults && latestFaceResults.multiFaceLandmarks && latestFaceResults.multiFaceLandmarks.length > 0) {
         const landmarks = latestFaceResults.multiFaceLandmarks[0];
 
-        // Deschidere Gură
         const lipTop = landmarks[13];
         const lipBottom = landmarks[14];
         const jawDist = Math.hypot(lipTop.x - lipBottom.x, lipTop.y - lipBottom.y);
         const sens = parseFloat(mouthSensSlider.value);
         const jawOpenValue = Math.min(Math.max((jawDist - 0.015) * sens, 0), 1);
 
-        // Poziționare Cap
         const leftEye = landmarks[33];
         const rightEye = landmarks[263];
         const nose = landmarks[1];
@@ -463,7 +459,6 @@
         const targetX = nose.x * canvasElement.width + offX;
         const targetY = nose.y * canvasElement.height + offY;
 
-        // Filtru Netezire (Smoothing)
         smoothX = lerp(smoothX || targetX, targetX, 0.3);
         smoothY = lerp(smoothY || targetY, targetY, 0.3);
         smoothAngle = lerp(smoothAngle || targetAngle, targetAngle, 0.3);
@@ -478,10 +473,8 @@
           canvasCtx.translate(smoothX, smoothY);
           canvasCtx.rotate(smoothAngle);
 
-          // Mască Avatar
           canvasCtx.drawImage(activeAvatar, -maskWidth / 2, -maskHeight / 2, maskWidth, maskHeight);
 
-          // Calibrare Automată Gură bazată pe centrul real al buzelor
           const lipCenterY = (lipTop.y + lipBottom.y) / 2;
           const autoMouthY = (lipCenterY - nose.y) * canvasElement.height;
 
