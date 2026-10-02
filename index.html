@@ -61,7 +61,7 @@
     .section-title {
       font-weight: bold;
       color: #94a3b8;
-      margin: 8px 0 4px 0;
+      margin: 10px 0 6px 0;
       border-bottom: 1px solid #1e293b;
       padding-bottom: 2px;
     }
@@ -243,7 +243,13 @@
     canvasElement.width = 640;
     canvasElement.height = 480;
 
-    // Elementele de control
+    // Canvas temporar pentru AI Cut-off
+    const segmentCanvas = document.createElement('canvas');
+    segmentCanvas.width = 640;
+    segmentCanvas.height = 480;
+    const segmentCtx = segmentCanvas.getContext('2d');
+
+    // Controls
     const toggleShowCamBtn = document.getElementById('toggleShowCam');
     const toggleAiCutBtn = document.getElementById('toggleAiCut');
 
@@ -262,7 +268,8 @@
     // Stări
     let showRealCam = false;
     let isAiCutOn = false;
-    let personMask = null;
+    let latestSegmentationMask = null;
+    let latestFaceResults = null;
 
     let activeBg = null;
     let activeAvatar = null;
@@ -270,12 +277,29 @@
     let savedBgs = JSON.parse(localStorage.getItem('vtuber_bgs') || '[]');
     let savedAvatars = JSON.parse(localStorage.getItem('vtuber_avatars') || '[]');
 
+    // Memorie Slidere Settings
+    const sliders = [scaleSlider, offsetXSlider, offsetYSlider, mouthXSlider, mouthYSlider, mouthWidthSlider, mouthSensSlider];
+    
+    function saveSliderSettings() {
+      const settings = {};
+      sliders.forEach(s => settings[s.id] = s.value);
+      localStorage.setItem('vtuber_slider_settings', JSON.stringify(settings));
+    }
+
+    function loadSliderSettings() {
+      const saved = JSON.parse(localStorage.getItem('vtuber_slider_settings') || '{}');
+      sliders.forEach(s => {
+        if (saved[s.id] !== undefined) s.value = saved[s.id];
+        s.addEventListener('input', saveSliderSettings);
+      });
+    }
+
     // Salvare & Randare Galerii
     function renderGalleries() {
       localStorage.setItem('vtuber_bgs', JSON.stringify(savedBgs));
       localStorage.setItem('vtuber_avatars', JSON.stringify(savedAvatars));
 
-      // Randare Fundaluri
+      // Fundaluri
       bgGallery.innerHTML = '';
       savedBgs.forEach((src, idx) => {
         const item = document.createElement('div');
@@ -301,7 +325,7 @@
         bgGallery.appendChild(item);
       });
 
-      // Randare Avatare
+      // Avatare
       avatarGallery.innerHTML = '';
       savedAvatars.forEach((src, idx) => {
         const item = document.createElement('div');
@@ -328,7 +352,7 @@
       });
     }
 
-    // Încărcare Fișiere
+    // Upload
     document.getElementById('bgLoader').addEventListener('change', (e) => {
       const file = e.target.files[0];
       if (file) {
@@ -375,18 +399,25 @@
       locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`
     });
     selfieSegmentation.setOptions({ modelSelection: 1 });
-    selfieSegmentation.onResults((results) => { personMask = results.segmentationMask; });
+    selfieSegmentation.onResults((results) => {
+      latestSegmentationMask = results.segmentationMask;
+    });
 
     const faceMesh = new FaceMesh({
       locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
     });
     faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
-
     faceMesh.onResults((results) => {
+      latestFaceResults = results;
+      drawScene();
+    });
+
+    // RENDER MAIN LOOP
+    function drawScene() {
       statusEl.innerText = "Tracking Activ 🟢";
       canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
 
-      // Layer 0: Fundalul Salvat
+      // 1. Desenează Fundalul Selectat
       if (activeBg && activeBg.complete) {
         canvasCtx.drawImage(activeBg, 0, 0, canvasElement.width, canvasElement.height);
       } else {
@@ -394,30 +425,39 @@
         canvasCtx.fillRect(0, 0, canvasElement.width, canvasElement.height);
       }
 
-      // Layer 1: Camera Reală (opțional cu AI Cut-Off)
+      // 2. Desenează Camera Reală (cu sau fără AI Cut-Off)
       if (showRealCam) {
-        canvasCtx.save();
-        if (isAiCutOn && personMask) {
-          canvasCtx.globalCompositeOperation = 'destination-over';
-          canvasCtx.drawImage(personMask, 0, 0, canvasElement.width, canvasElement.height);
-          canvasCtx.globalCompositeOperation = 'source-in';
+        if (isAiCutOn && latestSegmentationMask) {
+          segmentCtx.clearRect(0, 0, segmentCanvas.width, segmentCanvas.height);
+          
+          // Desenează masca de segmentare
+          segmentCtx.drawImage(latestSegmentationMask, 0, 0, segmentCanvas.width, segmentCanvas.height);
+          
+          // Păstrează doar omul
+          segmentCtx.globalCompositeOperation = 'source-in';
+          segmentCtx.drawImage(videoElement, 0, 0, segmentCanvas.width, segmentCanvas.height);
+          segmentCtx.globalCompositeOperation = 'source-over';
+
+          // Aplică omul decupat pe canvasul principal
+          canvasCtx.drawImage(segmentCanvas, 0, 0, canvasElement.width, canvasElement.height);
+        } else {
+          // Camera full fără decupare
+          canvasCtx.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
         }
-        canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
-        canvasCtx.restore();
       }
 
-      // Layer 2: Avatar / Mască cu Calibrare Gură
-      if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
-        const landmarks = results.multiFaceLandmarks[0];
+      // 3. Desenează Avatarul / Masca + Gura Dinamică
+      if (latestFaceResults && latestFaceResults.multiFaceLandmarks && latestFaceResults.multiFaceLandmarks.length > 0) {
+        const landmarks = latestFaceResults.multiFaceLandmarks[0];
 
-        // Calculare Deschidere Gură
+        // Deschidere Gură
         const lipTop = landmarks[13];
         const lipBottom = landmarks[14];
         const jawDist = Math.hypot(lipTop.x - lipBottom.x, lipTop.y - lipBottom.y);
         const sens = parseFloat(mouthSensSlider.value);
         const jawOpenValue = Math.min(Math.max((jawDist - 0.015) * sens, 0), 1);
 
-        // Urmărire Cap (Puncte Ochi și Nas)
+        // Pozitie Cap
         const leftEye = landmarks[33];
         const rightEye = landmarks[263];
         const nose = landmarks[1];
@@ -441,10 +481,10 @@
           canvasCtx.translate(centerX, centerY);
           canvasCtx.rotate(angle);
 
-          // Randare Avatar PNG
+          // Mască Avatar
           canvasCtx.drawImage(activeAvatar, -maskWidth / 2, -maskHeight / 2, maskWidth, maskHeight);
 
-          // Calibrare & Randare Gură Dinamică
+          // Gura Dinamică Calibrată
           const mX = parseFloat(mouthXSlider.value);
           const mY = parseFloat(mouthYSlider.value);
           const mWidth = parseFloat(mouthWidthSlider.value);
@@ -458,20 +498,23 @@
           canvasCtx.restore();
         }
       }
-    });
+    }
 
-    // Pornire Cameră
+    // Pornire Cameră & Loop
     const camera = new Camera(videoElement, {
       onFrame: async () => {
-        if (isAiCutOn && showRealCam) await selfieSegmentation.send({image: videoElement});
+        if (isAiCutOn && showRealCam) {
+          await selfieSegmentation.send({image: videoElement});
+        }
         await faceMesh.send({image: videoElement});
       },
       width: 640,
       height: 480
     });
 
-    camera.start();
+    loadSliderSettings();
     renderGalleries();
+    camera.start();
   </script>
 </body>
 </html>
