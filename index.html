@@ -2,8 +2,8 @@
 <html lang="ro">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>VTuber Studio v1.1 - Body & Face Tracking</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>VTuber Studio v1.2 - Drag & Fast Tracking</title>
 
   <!-- MediaPipe CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
@@ -12,7 +12,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js" crossorigin="anonymous"></script>
 
   <style>
-    * { box-sizing: border-box; }
+    * { box-sizing: border-box; touch-action: manipulation; }
     body {
       margin: 0;
       padding: 10px;
@@ -36,6 +36,7 @@
       border: 2px solid #0284c7;
       background: #000;
       box-shadow: 0 0 20px rgba(2, 132, 199, 0.2);
+      touch-action: none; /* Permite drag pe touch pe canvas */
     }
 
     video, canvas {
@@ -163,9 +164,9 @@
 </head>
 <body>
 
-  <h3>🎭 VTuber Studio v1.1 - DJ Cioko</h3>
+  <h3>🎭 VTuber Studio v1.2 - Fast & Touch Control</h3>
 
-  <div class="canvas-container">
+  <div class="canvas-container" id="canvasContainer">
     <video id="webcam" playsinline style="display:none;"></video>
     <canvas id="output_canvas"></canvas>
   </div>
@@ -176,10 +177,11 @@
     <div class="btn-group">
       <button id="toggleShowCam" class="btn">Camera Reala: OFF</button>
       <button id="toggleAiCut" class="btn">AI Cut-Off: OFF</button>
+      <button id="resetTouchBtn" class="btn">Reset Pozitie Touch</button>
     </div>
 
     <!-- Galerie Fundaluri -->
-    <div class="section-title">🖼️️ FUNDAL SCENĂ</div>
+    <div class="section-title">🖼 FUNDAL SCENĂ</div>
     <div class="btn-group">
       <label class="btn">
         ➕ Upload Fundal
@@ -232,12 +234,13 @@
       <input type="range" id="mouthSensSlider" min="1" max="30" step="1" value="15">
     </div>
 
-    <div id="status">Se încarcă modelele AI (v1.1)...</div>
+    <div id="status">Se încarcă modelele AI (v1.2)...</div>
   </div>
 
   <script>
     const videoElement = document.getElementById('webcam');
     const canvasElement = document.getElementById('output_canvas');
+    const canvasContainer = document.getElementById('canvasContainer');
     const canvasCtx = canvasElement.getContext('2d');
     const statusEl = document.getElementById('status');
 
@@ -251,6 +254,7 @@
 
     const toggleShowCamBtn = document.getElementById('toggleShowCam');
     const toggleAiCutBtn = document.getElementById('toggleAiCut');
+    const resetTouchBtn = document.getElementById('resetTouchBtn');
 
     const scaleSlider = document.getElementById('scaleSlider');
     const offsetXSlider = document.getElementById('offsetXSlider');
@@ -272,8 +276,17 @@
     let activeBg = null;
     let activeAvatar = null;
 
+    // Poziții interpolate
     let smoothX = 0, smoothY = 0, smoothAngle = 0, smoothEyeDist = 0;
+    // Răspuns ultra-rapid la mișcarea capului (lerp factor crescut la 0.85)
     const lerp = (start, end, amt) => (1 - amt) * start + amt * end;
+
+    // Touch / Drag offsets manual pe ecran
+    let dragOffsetX = 0;
+    let dragOffsetY = 0;
+    let isDragging = false;
+    let startTouchX = 0;
+    let startTouchY = 0;
 
     let savedBgs = JSON.parse(localStorage.getItem('vtuber_bgs') || '[]');
     let savedAvatars = JSON.parse(localStorage.getItem('vtuber_avatars') || '[]');
@@ -293,6 +306,50 @@
         s.addEventListener('input', saveSliderSettings);
       });
     }
+
+    // --- Control Drag / Touch ---
+    function handlePointerDown(clientX, clientY) {
+      isDragging = true;
+      startTouchX = clientX;
+      startTouchY = clientY;
+    }
+
+    function handlePointerMove(clientX, clientY) {
+      if (!isDragging) return;
+      const rect = canvasContainer.getBoundingClientRect();
+      // Ajustare pentru că canvas-ul are transform: scaleX(-1)
+      const deltaX = - (clientX - startTouchX) * (canvasElement.width / rect.width);
+      const deltaY = (clientY - startTouchY) * (canvasElement.height / rect.height);
+
+      dragOffsetX += deltaX;
+      dragOffsetY += deltaY;
+
+      startTouchX = clientX;
+      startTouchY = clientY;
+    }
+
+    function handlePointerUp() {
+      isDragging = false;
+    }
+
+    canvasContainer.addEventListener('mousedown', (e) => handlePointerDown(e.clientX, e.clientY));
+    window.addEventListener('mousemove', (e) => handlePointerMove(e.clientX, e.clientY));
+    window.addEventListener('mouseup', handlePointerUp);
+
+    canvasContainer.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 1) handlePointerDown(e.touches[0].clientX, e.touches[0].clientY);
+    }, { passive: true });
+
+    window.addEventListener('touchmove', (e) => {
+      if (e.touches.length === 1) handlePointerMove(e.touches[0].clientX, e.touches[0].clientY);
+    }, { passive: true });
+
+    window.addEventListener('touchend', handlePointerUp);
+
+    resetTouchBtn.addEventListener('click', () => {
+      dragOffsetX = 0;
+      dragOffsetY = 0;
+    });
 
     function renderGalleries() {
       localStorage.setItem('vtuber_bgs', JSON.stringify(savedBgs));
@@ -407,7 +464,7 @@
     });
 
     function drawScene() {
-      statusEl.innerText = "v1.1 Tracking Activ 🟢";
+      statusEl.innerText = "v1.2 Fast Tracking Activ 🟢";
       canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
 
       if (activeBg && activeBg.complete) {
@@ -421,10 +478,8 @@
         if (isAiCutOn && latestSegmentationMask) {
           segmentCtx.clearRect(0, 0, segmentCanvas.width, segmentCanvas.height);
           
-          // Aplică Soft Blur pe margine pentru integrare AR
-          segmentCtx.filter = 'blur(4px)';
+          // Fără blur - tăiere directă și rapidă
           segmentCtx.drawImage(latestSegmentationMask, 0, 0, segmentCanvas.width, segmentCanvas.height);
-          segmentCtx.filter = 'none';
 
           segmentCtx.globalCompositeOperation = 'source-in';
           segmentCtx.drawImage(videoElement, 0, 0, segmentCanvas.width, segmentCanvas.height);
@@ -454,15 +509,16 @@
         const targetAngle = Math.atan2(dy, dx);
         const targetEyeDist = Math.hypot(dx, dy);
 
-        const offX = parseFloat(offsetXSlider.value);
-        const offY = parseFloat(offsetYSlider.value);
+        const offX = parseFloat(offsetXSlider.value) + dragOffsetX;
+        const offY = parseFloat(offsetYSlider.value) + dragOffsetY;
         const targetX = nose.x * canvasElement.width + offX;
         const targetY = nose.y * canvasElement.height + offY;
 
-        smoothX = lerp(smoothX || targetX, targetX, 0.3);
-        smoothY = lerp(smoothY || targetY, targetY, 0.3);
-        smoothAngle = lerp(smoothAngle || targetAngle, targetAngle, 0.3);
-        smoothEyeDist = lerp(smoothEyeDist || targetEyeDist, targetEyeDist, 0.3);
+        // Factor lerp 0.85 -> masca se mișcă instant odată cu fața
+        smoothX = lerp(smoothX || targetX, targetX, 0.85);
+        smoothY = lerp(smoothY || targetY, targetY, 0.85);
+        smoothAngle = lerp(smoothAngle || targetAngle, targetAngle, 0.85);
+        smoothEyeDist = lerp(smoothEyeDist || targetEyeDist, targetEyeDist, 0.85);
 
         const scale = parseFloat(scaleSlider.value);
         const maskWidth = smoothEyeDist * scale;
