@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Alien Sci-Fi VTuber Studio - DJ Cioko</title>
+  <title>VTuber Studio Custom - DJ Cioko</title>
 
-  <!-- MediaPipe Libraries -->
+  <!-- MediaPipe CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js" crossorigin="anonymous"></script>
 
@@ -16,7 +16,7 @@
     body {
       margin: 0;
       padding: 10px;
-      background: #050811;
+      background: #090d16;
       color: #38bdf8;
       font-family: system-ui, -apple-system, sans-serif;
       display: flex;
@@ -24,7 +24,7 @@
       align-items: center;
     }
 
-    h3 { margin: 4px 0 10px 0; color: #38bdf8; text-align: center; }
+    h3 { margin: 4px 0 10px 0; color: #38bdf8; text-align: center; font-size: 16px; }
 
     .canvas-container {
       position: relative;
@@ -34,8 +34,8 @@
       border-radius: 12px;
       overflow: hidden;
       border: 2px solid #0284c7;
-      box-shadow: 0 0 25px rgba(2, 132, 199, 0.3);
       background: #000;
+      box-shadow: 0 0 20px rgba(2, 132, 199, 0.2);
     }
 
     video, canvas {
@@ -51,31 +51,25 @@
       width: 100%;
       max-width: 500px;
       margin-top: 10px;
-      background: #0f172a;
+      background: #111827;
       padding: 12px;
       border-radius: 10px;
-      border: 1px solid #1e293b;
-      font-size: 13px;
+      border: 1px solid #1f2937;
+      font-size: 12px;
     }
 
-    .row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 8px;
-    }
-
-    label { font-size: 12px; color: #94a3b8; }
-
-    input[type="range"] {
-      width: 55%;
-      accent-color: #38bdf8;
+    .section-title {
+      font-weight: bold;
+      color: #94a3b8;
+      margin: 8px 0 4px 0;
+      border-bottom: 1px solid #1e293b;
+      padding-bottom: 2px;
     }
 
     .btn-group {
       display: flex;
-      gap: 8px;
-      margin-bottom: 10px;
+      gap: 6px;
+      margin-bottom: 8px;
     }
 
     .btn {
@@ -88,6 +82,7 @@
       cursor: pointer;
       font-weight: bold;
       text-align: center;
+      font-size: 11px;
     }
 
     .btn.active {
@@ -97,17 +92,77 @@
 
     input[type="file"] { display: none; }
 
+    .gallery {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 6px;
+      margin-bottom: 6px;
+    }
+
+    .gallery-item {
+      position: relative;
+      width: 50px;
+      height: 50px;
+      border-radius: 6px;
+      border: 2px solid #334155;
+      overflow: hidden;
+      flex-shrink: 0;
+      cursor: pointer;
+    }
+
+    .gallery-item.active {
+      border-color: #38bdf8;
+    }
+
+    .gallery-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .delete-btn {
+      position: absolute;
+      top: 1px;
+      right: 1px;
+      background: #ef4444;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 16px;
+      height: 16px;
+      font-size: 9px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    label { color: #94a3b8; }
+
+    input[type="range"] {
+      width: 55%;
+      accent-color: #38bdf8;
+    }
+
     #status {
       font-size: 11px;
       color: #22c55e;
       text-align: center;
-      margin-top: 4px;
+      margin-top: 6px;
     }
   </style>
 </head>
 <body>
 
-  <h3>👽 VTuber Studio Sci-Fi Spaceship</h3>
+  <h3>🎭 VTuber Studio Calibration App</h3>
 
   <div class="canvas-container">
     <video id="webcam" playsinline style="display:none;"></video>
@@ -115,25 +170,65 @@
   </div>
 
   <div class="controls-panel">
+    
+    <!-- Toggles -->
     <div class="btn-group">
+      <button id="toggleShowCam" class="btn">Camera Reala: OFF</button>
       <button id="toggleAiCut" class="btn">AI Cut-Off: OFF</button>
-      <label class="btn" style="margin:0;">
-        📁 Upload Avatar
-        <input type="file" id="imageLoader" accept="image/*">
-      </label>
     </div>
 
+    <!-- Galerie Fundaluri -->
+    <div class="section-title">🖼️ FUNDAL SCENĂ</div>
+    <div class="btn-group">
+      <label class="btn">
+        ➕ Upload Fundal
+        <input type="file" id="bgLoader" accept="image/*">
+      </label>
+    </div>
+    <div class="gallery" id="bgGallery"></div>
+
+    <!-- Galerie Avatare -->
+    <div class="section-title">👽 AVATAR / MASCĂ</div>
+    <div class="btn-group">
+      <label class="btn">
+        ➕ Upload Avatar
+        <input type="file" id="avatarLoader" accept="image/*">
+      </label>
+    </div>
+    <div class="gallery" id="avatarGallery"></div>
+
+    <!-- Calibrare Mască -->
+    <div class="section-title">⚙️ CALIBRARE MASCĂ (AVATAR)</div>
     <div class="row">
-      <label>Scală Avatar (Size):</label>
+      <label>Scale Avatar (Size):</label>
       <input type="range" id="scaleSlider" min="1" max="5" step="0.1" value="2.8">
     </div>
     <div class="row">
-      <label>Offset Vertical (Y):</label>
-      <input type="range" id="offsetYSlider" min="-100" max="100" step="1" value="0">
+      <label>Offset Mască X:</label>
+      <input type="range" id="offsetXSlider" min="-100" max="100" step="1" value="0">
     </div>
     <div class="row">
-      <label>Sensibilitate Gură:</label>
-      <input type="range" id="mouthSensSlider" min="1" max="25" step="1" value="12">
+      <label>Offset Mască Y:</label>
+      <input type="range" id="offsetYSlider" min="-100" max="100" step="1" value="0">
+    </div>
+
+    <!-- Calibrare Gură -->
+    <div class="section-title">👄 CALIBRARE GURĂ DINAMICĂ</div>
+    <div class="row">
+      <label>Pozitie Gură X (Stânga/Dreapta):</label>
+      <input type="range" id="mouthXSlider" min="-100" max="100" step="1" value="0">
+    </div>
+    <div class="row">
+      <label>Pozitie Gură Y (Sus/Jos):</label>
+      <input type="range" id="mouthYSlider" min="-100" max="100" step="1" value="25">
+    </div>
+    <div class="row">
+      <label>Lățime Gură (Width):</label>
+      <input type="range" id="mouthWidthSlider" min="10" max="120" step="1" value="40">
+    </div>
+    <div class="row">
+      <label>Sensibilitate Deschidere Gură:</label>
+      <input type="range" id="mouthSensSlider" min="1" max="30" step="1" value="15">
     </div>
 
     <div id="status">Se încarcă modelele AI...</div>
@@ -148,153 +243,181 @@
     canvasElement.width = 640;
     canvasElement.height = 480;
 
-    // Setări Slidere
-    const scaleSlider = document.getElementById('scaleSlider');
-    const offsetYSlider = document.getElementById('offsetYSlider');
-    const mouthSensSlider = document.getElementById('mouthSensSlider');
+    // Elementele de control
+    const toggleShowCamBtn = document.getElementById('toggleShowCam');
     const toggleAiCutBtn = document.getElementById('toggleAiCut');
 
+    const scaleSlider = document.getElementById('scaleSlider');
+    const offsetXSlider = document.getElementById('offsetXSlider');
+    const offsetYSlider = document.getElementById('offsetYSlider');
+
+    const mouthXSlider = document.getElementById('mouthXSlider');
+    const mouthYSlider = document.getElementById('mouthYSlider');
+    const mouthWidthSlider = document.getElementById('mouthWidthSlider');
+    const mouthSensSlider = document.getElementById('mouthSensSlider');
+
+    const bgGallery = document.getElementById('bgGallery');
+    const avatarGallery = document.getElementById('avatarGallery');
+
+    // Stări
+    let showRealCam = false;
     let isAiCutOn = false;
-    let customImage = null;
     let personMask = null;
-    let jawOpenValue = 0;
 
-    // 1. Desenează Fundalul Procedural al Navei Spațiale (Sci-Fi Background Layer)
-    function drawSpaceshipBackground(ctx, w, h) {
-      // Perete fundal
-      let bgGrad = ctx.createLinearGradient(0, 0, 0, h);
-      bgGrad.addColorStop(0, '#020617');
-      bgGrad.addColorStop(1, '#0f172a');
-      ctx.fillStyle = bgGrad;
-      ctx.fillRect(0, 0, w, h);
+    let activeBg = null;
+    let activeAvatar = null;
 
-      // Hublou / Fereastră Spațială
-      ctx.save();
-      ctx.beginPath();
-      ctx.ellipse(w / 2, h / 2 - 20, 220, 150, 0, 0, Math.PI * 2);
-      ctx.fillStyle = '#010409';
-      ctx.fill();
-      ctx.lineWidth = 6;
-      ctx.strokeStyle = '#1e293b';
-      ctx.stroke();
+    let savedBgs = JSON.parse(localStorage.getItem('vtuber_bgs') || '[]');
+    let savedAvatars = JSON.parse(localStorage.getItem('vtuber_avatars') || '[]');
 
-      // Stele în fundal
-      ctx.fillStyle = '#ffffff';
-      for(let i = 0; i < 20; i++) {
-        let sx = (i * 37) % 400 + (w/2 - 200);
-        let sy = (i * 23) % 250 + (h/2 - 120);
-        ctx.fillRect(sx, sy, (i % 3) + 1, (i % 3) + 1);
+    // Salvare & Randare Galerii
+    function renderGalleries() {
+      localStorage.setItem('vtuber_bgs', JSON.stringify(savedBgs));
+      localStorage.setItem('vtuber_avatars', JSON.stringify(savedAvatars));
+
+      // Randare Fundaluri
+      bgGallery.innerHTML = '';
+      savedBgs.forEach((src, idx) => {
+        const item = document.createElement('div');
+        item.className = 'gallery-item' + (activeBg && activeBg.src === src ? ' active' : '');
+        const img = document.createElement('img');
+        img.src = src;
+        img.onclick = () => {
+          activeBg = new Image();
+          activeBg.src = src;
+          renderGalleries();
+        };
+        const delBtn = document.createElement('button');
+        delBtn.className = 'delete-btn';
+        delBtn.innerText = '✕';
+        delBtn.onclick = (e) => {
+          e.stopPropagation();
+          if (activeBg && activeBg.src === src) activeBg = null;
+          savedBgs.splice(idx, 1);
+          renderGalleries();
+        };
+        item.appendChild(img);
+        item.appendChild(delBtn);
+        bgGallery.appendChild(item);
+      });
+
+      // Randare Avatare
+      avatarGallery.innerHTML = '';
+      savedAvatars.forEach((src, idx) => {
+        const item = document.createElement('div');
+        item.className = 'gallery-item' + (activeAvatar && activeAvatar.src === src ? ' active' : '');
+        const img = document.createElement('img');
+        img.src = src;
+        img.onclick = () => {
+          activeAvatar = new Image();
+          activeAvatar.src = src;
+          renderGalleries();
+        };
+        const delBtn = document.createElement('button');
+        delBtn.className = 'delete-btn';
+        delBtn.innerText = '✕';
+        delBtn.onclick = (e) => {
+          e.stopPropagation();
+          if (activeAvatar && activeAvatar.src === src) activeAvatar = null;
+          savedAvatars.splice(idx, 1);
+          renderGalleries();
+        };
+        item.appendChild(img);
+        item.appendChild(delBtn);
+        avatarGallery.appendChild(item);
+      });
+    }
+
+    // Încărcare Fișiere
+    document.getElementById('bgLoader').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          savedBgs.push(evt.target.result);
+          activeBg = new Image();
+          activeBg.src = evt.target.result;
+          renderGalleries();
+        };
+        reader.readAsDataURL(file);
       }
-      ctx.restore();
+    });
 
-      // Consola Navei / Lumini Sci-Fi
-      ctx.fillStyle = '#090d16';
-      ctx.fillRect(0, h - 80, w, 80);
-      ctx.strokeStyle = '#0284c7';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(0, h - 80); ctx.lineTo(w, h - 80);
-      ctx.stroke();
+    document.getElementById('avatarLoader').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          savedAvatars.push(evt.target.result);
+          activeAvatar = new Image();
+          activeAvatar.src = evt.target.result;
+          renderGalleries();
+        };
+        reader.readAsDataURL(file);
+      }
+    });
 
-      // Luminițe consolă
-      ctx.fillStyle = '#22c55e'; ctx.fillRect(40, h - 50, 8, 8);
-      ctx.fillStyle = '#ef4444'; ctx.fillRect(60, h - 50, 8, 8);
-      ctx.fillStyle = '#38bdf8'; ctx.fillRect(80, h - 50, 20, 6);
-    }
+    // Toggle Buttons
+    toggleShowCamBtn.addEventListener('click', () => {
+      showRealCam = !showRealCam;
+      toggleShowCamBtn.innerText = `Camera Reala: ${showRealCam ? 'ON' : 'OFF'}`;
+      toggleShowCamBtn.classList.toggle('active', showRealCam);
+    });
 
-    // 2. Extraterestru Procedural SVG/Canvas în caz că nu există imagine încărcată
-    function drawProceduralAlien(ctx, centerX, centerY, width, height, jawOpen) {
-      ctx.save();
-      ctx.translate(centerX, centerY);
+    toggleAiCutBtn.addEventListener('click', () => {
+      isAiCutOn = !isAiCutOn;
+      toggleAiCutBtn.innerText = `AI Cut-Off: ${isAiCutOn ? 'ON' : 'OFF'}`;
+      toggleAiCutBtn.classList.toggle('active', isAiCutOn);
+    });
 
-      // Cap Extraterestru
-      ctx.beginPath();
-      ctx.ellipse(0, -20, width / 2.2, height / 1.8, 0, 0, Math.PI * 2);
-      ctx.fillStyle = '#3b82f6';
-      ctx.fill();
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = '#1d4ed8';
-      ctx.stroke();
-
-      // Ochi mari negri (Sci-Fi Alien)
-      ctx.fillStyle = '#000000';
-      ctx.beginPath();
-      ctx.ellipse(-width / 4, -40, width / 6, height / 5, Math.PI / 6, 0, Math.PI * 2);
-      ctx.ellipse(width / 4, -40, width / 6, height / 5, -Math.PI / 6, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Reflexii în ochi
-      ctx.fillStyle = '#38bdf8';
-      ctx.beginPath();
-      ctx.arc(-width / 4 + 5, -45, 5, 0, Math.PI * 2);
-      ctx.arc(width / 4 - 5, -45, 5, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Gura Dinamică (Se deschide după jawOpen)
-      let mouthHeight = Math.max(4, jawOpen * 45);
-      ctx.beginPath();
-      ctx.ellipse(0, 30, width / 5, mouthHeight / 2, 0, 0, Math.PI * 2);
-      ctx.fillStyle = '#0f172a';
-      ctx.fill();
-      ctx.strokeStyle = '#60a5fa';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-
-      ctx.restore();
-    }
-
-    // AI Cut-off Setup (Selfie Segmentation)
+    // MediaPipe Setup
     const selfieSegmentation = new SelfieSegmentation({
       locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`
     });
     selfieSegmentation.setOptions({ modelSelection: 1 });
-    selfieSegmentation.onResults((results) => {
-      personMask = results.segmentationMask;
-    });
+    selfieSegmentation.onResults((results) => { personMask = results.segmentationMask; });
 
-    // FaceMesh Setup
     const faceMesh = new FaceMesh({
       locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
     });
-
-    faceMesh.setOptions({
-      maxNumFaces: 1,
-      refineLandmarks: true,
-      minDetectionConfidence: 0.5,
-      minTrackingConfidence: 0.5
-    });
+    faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
 
     faceMesh.onResults((results) => {
-      statusEl.innerText = "Tracking Sci-Fi Activ 🟢";
-      
-      // Clear canvas
+      statusEl.innerText = "Tracking Activ 🟢";
       canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
 
-      // Layer 0: Fundalul Navei
-      drawSpaceshipBackground(canvasCtx, canvasElement.width, canvasElement.height);
+      // Layer 0: Fundalul Salvat
+      if (activeBg && activeBg.complete) {
+        canvasCtx.drawImage(activeBg, 0, 0, canvasElement.width, canvasElement.height);
+      } else {
+        canvasCtx.fillStyle = '#050811';
+        canvasCtx.fillRect(0, 0, canvasElement.width, canvasElement.height);
+      }
 
-      // Layer 1: Dacă AI Cut-Off e pornit, afișează doar corpul utilizatorului decupat
-      if (isAiCutOn && personMask) {
+      // Layer 1: Camera Reală (opțional cu AI Cut-Off)
+      if (showRealCam) {
         canvasCtx.save();
-        canvasCtx.globalCompositeOperation = 'destination-over';
-        canvasCtx.drawImage(personMask, 0, 0, canvasElement.width, canvasElement.height);
-        canvasCtx.globalCompositeOperation = 'source-in';
+        if (isAiCutOn && personMask) {
+          canvasCtx.globalCompositeOperation = 'destination-over';
+          canvasCtx.drawImage(personMask, 0, 0, canvasElement.width, canvasElement.height);
+          canvasCtx.globalCompositeOperation = 'source-in';
+        }
         canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
         canvasCtx.restore();
       }
 
-      // Layer 2: Tracker & Avatar Overlay
+      // Layer 2: Avatar / Mască cu Calibrare Gură
       if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
         const landmarks = results.multiFaceLandmarks[0];
 
-        // Calculare Gură (jawOpen)
+        // Calculare Deschidere Gură
         const lipTop = landmarks[13];
         const lipBottom = landmarks[14];
         const jawDist = Math.hypot(lipTop.x - lipBottom.x, lipTop.y - lipBottom.y);
         const sens = parseFloat(mouthSensSlider.value);
-        jawOpenValue = Math.min(Math.max((jawDist - 0.015) * sens, 0), 1);
+        const jawOpenValue = Math.min(Math.max((jawDist - 0.015) * sens, 0), 1);
 
-        // Pozitionare cap
+        // Urmărire Cap (Puncte Ochi și Nas)
         const leftEye = landmarks[33];
         const rightEye = landmarks[263];
         const nose = landmarks[1];
@@ -308,55 +431,39 @@
         const maskWidth = eyeDistance * scale;
         const maskHeight = maskWidth;
 
-        const offsetY = parseFloat(offsetYSlider.value);
-        const centerX = nose.x * canvasElement.width;
-        const centerY = nose.y * canvasElement.height + offsetY;
+        const offX = parseFloat(offsetXSlider.value);
+        const offY = parseFloat(offsetYSlider.value);
+        const centerX = nose.x * canvasElement.width + offX;
+        const centerY = nose.y * canvasElement.height + offY;
 
-        if (customImage && customImage.complete) {
-          // Randare imagine încărcată (custom PNG)
+        if (activeAvatar && activeAvatar.complete) {
           canvasCtx.save();
           canvasCtx.translate(centerX, centerY);
           canvasCtx.rotate(angle);
-          canvasCtx.drawImage(customImage, -maskWidth / 2, -maskHeight / 2, maskWidth, maskHeight);
-          
-          // Suprapunere gură dinamică peste PNG
-          let mouthHeight = Math.max(2, jawOpenValue * 30);
+
+          // Randare Avatar PNG
+          canvasCtx.drawImage(activeAvatar, -maskWidth / 2, -maskHeight / 2, maskWidth, maskHeight);
+
+          // Calibrare & Randare Gură Dinamică
+          const mX = parseFloat(mouthXSlider.value);
+          const mY = parseFloat(mouthYSlider.value);
+          const mWidth = parseFloat(mouthWidthSlider.value);
+          const mouthOpenH = Math.max(2, jawOpenValue * 25);
+
           canvasCtx.beginPath();
-          canvasCtx.ellipse(0, maskHeight / 4, maskWidth / 6, mouthHeight / 2, 0, 0, Math.PI * 2);
-          canvasCtx.fillStyle = '#000';
+          canvasCtx.ellipse(mX, mY, mWidth / 2, mouthOpenH / 2, 0, 0, Math.PI * 2);
+          canvasCtx.fillStyle = '#050811';
           canvasCtx.fill();
+
           canvasCtx.restore();
-        } else {
-          // Randare Extraterestru dinamic în cod
-          drawProceduralAlien(canvasCtx, centerX, centerY, maskWidth, maskHeight, jawOpenValue);
         }
       }
     });
 
-    // Upload Handler
-    document.getElementById('imageLoader').addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          customImage = new Image();
-          customImage.src = event.target.result;
-        };
-        reader.readAsDataURL(file);
-      }
-    });
-
-    // Toggle AI Cut-Off
-    toggleAiCutBtn.addEventListener('click', () => {
-      isAiCutOn = !isAiCutOn;
-      toggleAiCutBtn.innerText = `AI Cut-Off: ${isAiCutOn ? 'ON' : 'OFF'}`;
-      toggleAiCutBtn.classList.toggle('active', isAiCutOn);
-    });
-
-    // Loop Cameră
+    // Pornire Cameră
     const camera = new Camera(videoElement, {
       onFrame: async () => {
-        if (isAiCutOn) await selfieSegmentation.send({image: videoElement});
+        if (isAiCutOn && showRealCam) await selfieSegmentation.send({image: videoElement});
         await faceMesh.send({image: videoElement});
       },
       width: 640,
@@ -364,6 +471,7 @@
     });
 
     camera.start();
+    renderGalleries();
   </script>
 </body>
 </html>
