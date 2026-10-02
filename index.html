@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>VTubing Face Tracker - DJ Cioko</title>
+  <title>VTubing Custom Mask Overlay - DJ Cioko</title>
 
-  <!-- Biblioteci MediaPipe CDN -->
+  <!-- MediaPipe CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
@@ -17,7 +17,7 @@
       padding: 12px;
       background: #090d16;
       color: #fff;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-family: system-ui, -apple-system, sans-serif;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -33,7 +33,7 @@
       border-radius: 12px;
       overflow: hidden;
       border: 1px solid #1e293b;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      background: #000;
     }
 
     video, canvas {
@@ -45,7 +45,7 @@
       transform: scaleX(-1);
     }
 
-    .metrics-panel {
+    .controls-panel {
       width: 100%;
       max-width: 480px;
       margin-top: 12px;
@@ -55,65 +55,154 @@
       border: 1px solid #1f2937;
     }
 
-    .metric {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 8px;
-      font-size: 13px;
+    .upload-btn {
+      display: block;
+      width: 100%;
+      padding: 10px;
+      background: #0284c7;
+      color: white;
+      text-align: center;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: bold;
+      margin-bottom: 12px;
     }
 
-    progress {
-      width: 50%;
-      height: 12px;
-      accent-color: #38bdf8;
+    input[type="file"] { display: none; }
+
+    .gallery {
+      display: flex;
+      gap: 10px;
+      overflow-x: auto;
+      padding-bottom: 5px;
+    }
+
+    .gallery-item {
+      position: relative;
+      width: 60px;
+      height: 60px;
+      border-radius: 8px;
+      border: 2px solid #334155;
+      overflow: hidden;
+      flex-shrink: 0;
+      cursor: pointer;
+    }
+
+    .gallery-item.active {
+      border-color: #38bdf8;
+    }
+
+    .gallery-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .delete-btn {
+      position: absolute;
+      top: 2px;
+      right: 2px;
+      background: #ef4444;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 18px;
+      height: 18px;
+      font-size: 10px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
     #status {
       font-size: 12px;
-      color: #eab308;
+      color: #22c55e;
       text-align: center;
-      margin-top: 6px;
+      margin-top: 8px;
     }
   </style>
 </head>
 <body>
 
-  <h2>🎭 VTubing Face Tracker (478 Puncte)</h2>
+  <h2>🎭 VTubing Custom Overlay App</h2>
 
   <div class="canvas-container">
     <video id="webcam" playsinline></video>
     <canvas id="output_canvas"></canvas>
   </div>
 
-  <div class="metrics-panel">
-    <div class="metric">
-      <span>Gură deschisă (jawOpen):</span>
-      <progress id="jawProgress" value="0" max="1"></progress>
-    </div>
-    <div class="metric">
-      <span>Clipire Stânga (eyeBlink):</span>
-      <progress id="blinkProgress" value="0" max="1"></progress>
-    </div>
-    <div class="metric">
-      <span>Iris Stâng (X, Y):</span>
-      <strong id="irisCoords" style="color: #38bdf8;">0.00, 0.00</strong>
-    </div>
-    <div id="status">Se pornește camera... Permiteți accesul!</div>
+  <div class="controls-panel">
+    <label class="upload-btn">
+      ➕ Încarcă Imagine (PNG / JPG)
+      <input type="file" id="imageLoader" accept="image/*">
+    </label>
+
+    <div style="font-size: 12px; margin-bottom: 6px; color: #94a3b8;">Măștile tale salvate:</div>
+    <div class="gallery" id="gallery"></div>
+
+    <div id="status">Se pornește camera...</div>
   </div>
 
   <script>
     const videoElement = document.getElementById('webcam');
     const canvasElement = document.getElementById('output_canvas');
     const canvasCtx = canvasElement.getContext('2d');
-
-    const jawProgress = document.getElementById('jawProgress');
-    const blinkProgress = document.getElementById('blinkProgress');
-    const irisCoords = document.getElementById('irisCoords');
+    const galleryEl = document.getElementById('gallery');
     const statusEl = document.getElementById('status');
+
+    let activeImage = null;
+    let savedImages = JSON.parse(localStorage.getItem('vtuber_masks') || '[]');
 
     canvasElement.width = 640;
     canvasElement.height = 480;
+
+    function saveAndRenderGallery() {
+      localStorage.setItem('vtuber_masks', JSON.stringify(savedImages));
+      galleryEl.innerHTML = '';
+      
+      savedImages.forEach((src, index) => {
+        const item = document.createElement('div');
+        item.className = 'gallery-item' + (activeImage && activeImage.src === src ? ' active' : '');
+        
+        const img = document.createElement('img');
+        img.src = src;
+        img.onclick = () => {
+          activeImage = new Image();
+          activeImage.src = src;
+          saveAndRenderGallery();
+        };
+
+        const delBtn = document.createElement('button');
+        delBtn.className = 'delete-btn';
+        delBtn.innerText = '✕';
+        delBtn.onclick = (e) => {
+          e.stopPropagation();
+          if (activeImage && activeImage.src === src) activeImage = null;
+          savedImages.splice(index, 1);
+          saveAndRenderGallery();
+        };
+
+        item.appendChild(img);
+        item.appendChild(delBtn);
+        galleryEl.appendChild(item);
+      });
+    }
+
+    document.getElementById('imageLoader').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(event) {
+          const base64Img = event.target.result;
+          savedImages.push(base64Img);
+          activeImage = new Image();
+          activeImage.src = base64Img;
+          saveAndRenderGallery();
+        };
+        reader.readAsDataURL(file);
+      }
+    });
 
     const faceMesh = new FaceMesh({
       locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
@@ -128,31 +217,37 @@
 
     faceMesh.onResults((results) => {
       statusEl.innerText = "Tracking Activ 🟢";
-      statusEl.style.color = "#22c55e";
-
       canvasCtx.save();
       canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
 
       if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
         const landmarks = results.multiFaceLandmarks[0];
 
-        drawConnectors(canvasCtx, landmarks, FACEMESH_TESSELATION, {color: '#C0C0C040', lineWidth: 1});
-        drawConnectors(canvasCtx, landmarks, FACEMESH_RIGHT_IRIS, {color: '#00FFFF', lineWidth: 2});
-        drawConnectors(canvasCtx, landmarks, FACEMESH_LEFT_IRIS, {color: '#FF00FF', lineWidth: 2});
+        // Mască vizuală discretă
+        drawConnectors(canvasCtx, landmarks, FACEMESH_TESSELATION, {color: '#C0C0C020', lineWidth: 1});
 
-        const lipTop = landmarks[13];
-        const lipBottom = landmarks[14];
-        const jawDist = Math.hypot(lipTop.x - lipBottom.x, lipTop.y - lipBottom.y);
-        const jawOpen = Math.min(Math.max((jawDist - 0.015) * 12, 0), 1);
-        jawProgress.value = jawOpen;
+        if (activeImage && activeImage.complete) {
+          const leftEye = landmarks[33];
+          const rightEye = landmarks[263];
+          const nose = landmarks[1];
 
-        const eyeTop = landmarks[159];
-        const eyeBottom = landmarks[145];
-        const eyeDist = Math.hypot(eyeTop.x - eyeBottom.x, eyeTop.y - eyeBottom.y);
-        blinkProgress.value = eyeDist < 0.018 ? 1 : 0;
+          const dx = (rightEye.x - leftEye.x) * canvasElement.width;
+          const dy = (rightEye.y - leftEye.y) * canvasElement.height;
+          const angle = Math.atan2(dy, dx);
 
-        const leftIris = landmarks[468];
-        irisCoords.innerText = `${leftIris.x.toFixed(2)},${leftIris.y.toFixed(2)}`;
+          const eyeDistance = Math.hypot(dx, dy);
+          const maskWidth = eyeDistance * 3.2;
+          const maskHeight = maskWidth * (activeImage.height / activeImage.width);
+
+          const centerX = nose.x * canvasElement.width;
+          const centerY = nose.y * canvasElement.height;
+
+          canvasCtx.save();
+          canvasCtx.translate(centerX, centerY);
+          canvasCtx.rotate(angle);
+          canvasCtx.drawImage(activeImage, -maskWidth / 2, -maskHeight / 2, maskWidth, maskHeight);
+          canvasCtx.restore();
+        }
       }
       canvasCtx.restore();
     });
@@ -165,10 +260,8 @@
       height: 480
     });
 
-    camera.start().catch(() => {
-      statusEl.innerText = "Eroare acces cameră!";
-      statusEl.style.color = "#ef4444";
-    });
+    camera.start();
+    saveAndRenderGallery();
   </script>
 </body>
 </html>
