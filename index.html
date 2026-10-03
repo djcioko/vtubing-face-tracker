@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>VTuber Studio v1.2 - Drag & Fast Tracking</title>
+  <title>VTuber Studio v1.3 - Vertical Portrait & Fast Calibration</title>
 
   <!-- MediaPipe CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
@@ -26,17 +26,18 @@
 
     h3 { margin: 4px 0 10px 0; color: #38bdf8; text-align: center; font-size: 16px; }
 
+    /* Format Vertical (Portrait 9:16) */
     .canvas-container {
       position: relative;
       width: 100%;
-      max-width: 500px;
-      aspect-ratio: 4/3;
+      max-width: 360px;
+      aspect-ratio: 9/16;
       border-radius: 12px;
       overflow: hidden;
       border: 2px solid #0284c7;
       background: #000;
       box-shadow: 0 0 20px rgba(2, 132, 199, 0.2);
-      touch-action: none; /* Permite drag pe touch pe canvas */
+      touch-action: none;
     }
 
     video, canvas {
@@ -51,7 +52,7 @@
 
     .controls-panel {
       width: 100%;
-      max-width: 500px;
+      max-width: 360px;
       margin-top: 10px;
       background: #111827;
       padding: 12px;
@@ -70,12 +71,13 @@
 
     .btn-group {
       display: flex;
+      flex-wrap: wrap;
       gap: 6px;
       margin-bottom: 8px;
     }
 
     .btn {
-      flex: 1;
+      flex: 1 1 calc(50% - 6px);
       padding: 8px;
       background: #1e293b;
       border: 1px solid #0284c7;
@@ -164,7 +166,7 @@
 </head>
 <body>
 
-  <h3>🎭 VTuber Studio v1.2 - Fast & Touch Control</h3>
+  <h3>🎭 VTuber Studio v1.3 - Portrait Mode</h3>
 
   <div class="canvas-container" id="canvasContainer">
     <video id="webcam" playsinline style="display:none;"></video>
@@ -173,17 +175,18 @@
 
   <div class="controls-panel">
     
-    <!-- Toggles -->
+    <!-- Toggles & Quick Actions -->
     <div class="btn-group">
       <button id="toggleShowCam" class="btn">Camera Reala: OFF</button>
       <button id="toggleAiCut" class="btn">AI Cut-Off: OFF</button>
+      <button id="autoCalibrateBtn" class="btn">🎯 Autocalibrare Centru</button>
       <button id="resetTouchBtn" class="btn">Reset Pozitie Touch</button>
     </div>
 
     <!-- Galerie Fundaluri -->
     <div class="section-title">🖼 FUNDAL SCENĂ</div>
     <div class="btn-group">
-      <label class="btn">
+      <label class="btn" style="flex: 100%;">
         ➕ Upload Fundal
         <input type="file" id="bgLoader" accept="image/*">
       </label>
@@ -193,7 +196,7 @@
     <!-- Galerie Avatare -->
     <div class="section-title">👽 AVATAR / MASCĂ</div>
     <div class="btn-group">
-      <label class="btn">
+      <label class="btn" style="flex: 100%;">
         ➕ Upload Avatar
         <input type="file" id="avatarLoader" accept="image/*">
       </label>
@@ -201,18 +204,18 @@
     <div class="gallery" id="avatarGallery"></div>
 
     <!-- Calibrare Mască -->
-    <div class="section-title">⚙️ CALIBRARE MASCĂ (AVATAR)</div>
+    <div class="section-title">⚙️️ CALIBRARE MASCĂ (AVATAR)</div>
     <div class="row">
       <label>Scale Avatar (Size):</label>
       <input type="range" id="scaleSlider" min="1" max="5" step="0.1" value="2.8">
     </div>
     <div class="row">
       <label>Offset Mască X:</label>
-      <input type="range" id="offsetXSlider" min="-100" max="100" step="1" value="0">
+      <input type="range" id="offsetXSlider" min="-150" max="150" step="1" value="0">
     </div>
     <div class="row">
       <label>Offset Mască Y:</label>
-      <input type="range" id="offsetYSlider" min="-100" max="100" step="1" value="0">
+      <input type="range" id="offsetYSlider" min="-150" max="150" step="1" value="0">
     </div>
 
     <!-- Calibrare Gură -->
@@ -234,7 +237,7 @@
       <input type="range" id="mouthSensSlider" min="1" max="30" step="1" value="15">
     </div>
 
-    <div id="status">Se încarcă modelele AI (v1.2)...</div>
+    <div id="status">Se încarcă modelele AI (v1.3)...</div>
   </div>
 
   <script>
@@ -244,17 +247,19 @@
     const canvasCtx = canvasElement.getContext('2d');
     const statusEl = document.getElementById('status');
 
-    canvasElement.width = 640;
-    canvasElement.height = 480;
+    // Canvas optimizat pentru rezoluție portrait (9:16)
+    canvasElement.width = 480;
+    canvasElement.height = 854;
 
     const segmentCanvas = document.createElement('canvas');
-    segmentCanvas.width = 640;
-    segmentCanvas.height = 480;
+    segmentCanvas.width = 480;
+    segmentCanvas.height = 854;
     const segmentCtx = segmentCanvas.getContext('2d');
 
     const toggleShowCamBtn = document.getElementById('toggleShowCam');
     const toggleAiCutBtn = document.getElementById('toggleAiCut');
     const resetTouchBtn = document.getElementById('resetTouchBtn');
+    const autoCalibrateBtn = document.getElementById('autoCalibrateBtn');
 
     const scaleSlider = document.getElementById('scaleSlider');
     const offsetXSlider = document.getElementById('offsetXSlider');
@@ -276,12 +281,9 @@
     let activeBg = null;
     let activeAvatar = null;
 
-    // Poziții interpolate
     let smoothX = 0, smoothY = 0, smoothAngle = 0, smoothEyeDist = 0;
-    // Răspuns ultra-rapid la mișcarea capului (lerp factor crescut la 0.85)
     const lerp = (start, end, amt) => (1 - amt) * start + amt * end;
 
-    // Touch / Drag offsets manual pe ecran
     let dragOffsetX = 0;
     let dragOffsetY = 0;
     let isDragging = false;
@@ -307,7 +309,7 @@
       });
     }
 
-    // --- Control Drag / Touch ---
+    // Touch & Drag Handling
     function handlePointerDown(clientX, clientY) {
       isDragging = true;
       startTouchX = clientX;
@@ -317,7 +319,6 @@
     function handlePointerMove(clientX, clientY) {
       if (!isDragging) return;
       const rect = canvasContainer.getBoundingClientRect();
-      // Ajustare pentru că canvas-ul are transform: scaleX(-1)
       const deltaX = - (clientX - startTouchX) * (canvasElement.width / rect.width);
       const deltaY = (clientY - startTouchY) * (canvasElement.height / rect.height);
 
@@ -328,9 +329,7 @@
       startTouchY = clientY;
     }
 
-    function handlePointerUp() {
-      isDragging = false;
-    }
+    function handlePointerUp() { isDragging = false; }
 
     canvasContainer.addEventListener('mousedown', (e) => handlePointerDown(e.clientX, e.clientY));
     window.addEventListener('mousemove', (e) => handlePointerMove(e.clientX, e.clientY));
@@ -349,6 +348,18 @@
     resetTouchBtn.addEventListener('click', () => {
       dragOffsetX = 0;
       dragOffsetY = 0;
+      offsetXSlider.value = 0;
+      offsetYSlider.value = 0;
+      saveSliderSettings();
+    });
+
+    autoCalibrateBtn.addEventListener('click', () => {
+      dragOffsetX = 0;
+      dragOffsetY = 0;
+      offsetXSlider.value = 0;
+      offsetYSlider.value = 0;
+      saveSliderSettings();
+      statusEl.innerText = "Centrat cu succes! 🎯";
     });
 
     function renderGalleries() {
@@ -464,7 +475,7 @@
     });
 
     function drawScene() {
-      statusEl.innerText = "v1.2 Fast Tracking Activ 🟢";
+      statusEl.innerText = "v1.3 Portrait Active 🟢";
       canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
 
       if (activeBg && activeBg.complete) {
@@ -477,10 +488,7 @@
       if (showRealCam) {
         if (isAiCutOn && latestSegmentationMask) {
           segmentCtx.clearRect(0, 0, segmentCanvas.width, segmentCanvas.height);
-          
-          // Fără blur - tăiere directă și rapidă
           segmentCtx.drawImage(latestSegmentationMask, 0, 0, segmentCanvas.width, segmentCanvas.height);
-
           segmentCtx.globalCompositeOperation = 'source-in';
           segmentCtx.drawImage(videoElement, 0, 0, segmentCanvas.width, segmentCanvas.height);
           segmentCtx.globalCompositeOperation = 'source-over';
@@ -514,7 +522,6 @@
         const targetX = nose.x * canvasElement.width + offX;
         const targetY = nose.y * canvasElement.height + offY;
 
-        // Factor lerp 0.85 -> masca se mișcă instant odată cu fața
         smoothX = lerp(smoothX || targetX, targetX, 0.85);
         smoothY = lerp(smoothY || targetY, targetY, 0.85);
         smoothAngle = lerp(smoothAngle || targetAngle, targetAngle, 0.85);
@@ -559,8 +566,8 @@
         }
         await faceMesh.send({image: videoElement});
       },
-      width: 640,
-      height: 480
+      width: 480,
+      height: 854
     });
 
     loadSliderSettings();
