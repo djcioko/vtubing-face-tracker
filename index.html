@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>VTuber Studio v1.5 - Full Camera & Crop Calibration</title>
+  <title>VTuber Studio v1.6 - Video BG & AI Crop Zoom</title>
 
   <!-- MediaPipe CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
@@ -26,7 +26,6 @@
 
     h3 { margin: 4px 0 10px 0; color: #38bdf8; text-align: center; font-size: 16px; }
 
-    /* Format Patrat 1:1 Instagram */
     .canvas-container {
       position: relative;
       width: 100%;
@@ -50,7 +49,11 @@
       width: 100%;
       height: 100%;
       object-fit: cover;
-      transform: scaleX(-1);
+    }
+
+    /* Video-ul ascuns de fundal */
+    #bgVideoElement {
+      display: none;
     }
 
     .controls-panel {
@@ -126,10 +129,11 @@
       overflow: hidden;
       flex-shrink: 0;
       cursor: pointer;
+      background: #000;
     }
 
     .gallery-item.active { border-color: #38bdf8; }
-    .gallery-item img { width: 100%; height: 100%; object-fit: cover; }
+    .gallery-item img, .gallery-item video { width: 100%; height: 100%; object-fit: cover; }
 
     .delete-btn {
       position: absolute;
@@ -146,6 +150,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      z-index: 5;
     }
 
     .row {
@@ -168,10 +173,11 @@
 </head>
 <body>
 
-  <h3>🎭 VTuber Studio v1.5 - Full Screen & AI Crop</h3>
+  <h3>🎭 VTuber Studio v1.6 - Video BG & AI Crop Zoom</h3>
 
   <div class="canvas-container" id="canvasContainer">
     <video id="webcam" playsinline style="display:none;"></video>
+    <video id="bgVideoElement" loop playsinline muted></video>
     <canvas id="output_canvas"></canvas>
   </div>
 
@@ -181,17 +187,18 @@
     <div class="btn-group">
       <button id="toggleShowCam" class="btn">Camera Reala: OFF</button>
       <button id="toggleAiCut" class="btn">AI Cut-Off: OFF</button>
+      <button id="btnCrop" class="btn">AI Crop OFF</button>
       <button id="autoCalibrateBtn" class="btn">🎯 Autocalibrare Centru</button>
       <button id="resetTouchBtn" class="btn">Reset Pozitie Touch</button>
       <button id="fullScreenBtn" class="btn btn-full btn-fullscreen">🖥️ Full Screen (Ecran Complet)</button>
     </div>
 
-    <!-- Galerie Fundaluri -->
-    <div class="section-title">🖼 FUNDAL SCENĂ</div>
+    <!-- Galerie Fundaluri (Imagine / Video) -->
+    <div class="section-title">🖼️ / 🎬 FUNDAL SCENĂ (IMAGINE SAU VIDEO)</div>
     <div class="btn-group">
       <label class="btn" style="flex: 100%;">
-        ➕ Upload Fundal
-        <input type="file" id="bgLoader" accept="image/*">
+        ➕ Upload Fundal (Foto / Video)
+        <input type="file" id="bgLoader" accept="image/*, video/*">
       </label>
     </div>
     <div class="gallery" id="bgGallery"></div>
@@ -245,6 +252,7 @@
 
   <script>
     const videoElement = document.getElementById('webcam');
+    const bgVideoElement = document.getElementById('bgVideoElement');
     const canvasElement = document.getElementById('output_canvas');
     const canvasContainer = document.getElementById('canvasContainer');
     const canvasCtx = canvasElement.getContext('2d');
@@ -260,6 +268,7 @@
 
     const toggleShowCamBtn = document.getElementById('toggleShowCam');
     const toggleAiCutBtn = document.getElementById('toggleAiCut');
+    const btnCrop = document.getElementById('btnCrop');
     const resetTouchBtn = document.getElementById('resetTouchBtn');
     const autoCalibrateBtn = document.getElementById('autoCalibrateBtn');
     const fullScreenBtn = document.getElementById('fullScreenBtn');
@@ -278,10 +287,12 @@
 
     let showRealCam = false;
     let isAiCutOn = false;
+    let isAiCropOn = false; // Starea pentru AI Crop / Zoom
     let latestSegmentationMask = null;
     let latestFaceResults = null;
 
-    let activeBg = null;
+    let activeBgType = null; // 'image' sau 'video'
+    let activeBgImage = null;
     let activeAvatar = null;
 
     let smoothX = 0, smoothY = 0, smoothAngle = 0, smoothEyeDist = 0;
@@ -293,8 +304,8 @@
     let startTouchX = 0;
     let startTouchY = 0;
 
-    let savedBgs = JSON.parse(localStorage.getItem('vtuber_bgs') || '[]');
-    let savedAvatars = JSON.parse(localStorage.getItem('vtuber_avatars') || '[]');
+    let savedBgs = JSON.parse(localStorage.getItem('vtuber_bgs_v16') || '[]');
+    let savedAvatars = JSON.parse(localStorage.getItem('vtuber_avatars_v16') || '[]');
 
     const sliders = [scaleSlider, offsetXSlider, offsetYSlider, mouthXSlider, mouthYSlider, mouthWidthSlider, mouthSensSlider];
     
@@ -311,6 +322,20 @@
         s.addEventListener('input', saveSliderSettings);
       });
     }
+
+    // Funcționalitatea Butonului AI Crop OFF / ON (Ajustează automat Zoom/Scale pe camera/avatar)
+    btnCrop.addEventListener('click', () => {
+      isAiCropOn = !isAiCropOn;
+      btnCrop.innerText = `AI Crop ${isAiCropOn ? 'ON' : 'OFF'}`;
+      btnCrop.classList.toggle('active', isAiCropOn);
+      
+      if (isAiCropOn) {
+        scaleSlider.value = 3.5; // Zoom mărit automat pentru a elimina tăieturile nepotrivite
+      } else {
+        scaleSlider.value = 2.8;
+      }
+      saveSliderSettings();
+    });
 
     // Full Screen Toggle
     fullScreenBtn.addEventListener('click', () => {
@@ -379,36 +404,66 @@
       dragOffsetY = 0;
       offsetXSlider.value = 0;
       offsetYSlider.value = 0;
-      scaleSlider.value = 3.0;
+      scaleSlider.value = isAiCropOn ? 3.5 : 2.8;
       saveSliderSettings();
       statusEl.innerText = "Centrat & Scalat cu succes! 🎯";
     });
 
     function renderGalleries() {
-      localStorage.setItem('vtuber_bgs', JSON.stringify(savedBgs));
-      localStorage.setItem('vtuber_avatars', JSON.stringify(savedAvatars));
+      localStorage.setItem('vtuber_bgs_v16', JSON.stringify(savedBgs));
+      localStorage.setItem('vtuber_avatars_v16', JSON.stringify(savedAvatars));
 
       bgGallery.innerHTML = '';
-      savedBgs.forEach((src, idx) => {
+      savedBgs.forEach((itemData, idx) => {
         const item = document.createElement('div');
-        item.className = 'gallery-item' + (activeBg && activeBg.src === src ? ' active' : '');
-        const img = document.createElement('img');
-        img.src = src;
-        img.onclick = () => {
-          activeBg = new Image();
-          activeBg.src = src;
+        const isActive = (activeBgType === itemData.type && (
+          (itemData.type === 'image' && activeBgImage && activeBgImage.src === itemData.src) ||
+          (itemData.type === 'video' && bgVideoElement.src === itemData.src)
+        ));
+
+        item.className = 'gallery-item' + (isActive ? ' active' : '');
+        
+        let mediaEl;
+        if (itemData.type === 'video') {
+          mediaEl = document.createElement('video');
+          mediaEl.muted = true;
+          mediaEl.playsinline = true;
+        } else {
+          mediaEl = document.createElement('img');
+        }
+        mediaEl.src = itemData.src;
+
+        item.onclick = () => {
+          activeBgType = itemData.type;
+          if (itemData.type === 'video') {
+            activeBgImage = null;
+            bgVideoElement.src = itemData.src;
+            bgVideoElement.play();
+          } else {
+            bgVideoElement.pause();
+            activeBgImage = new Image();
+            activeBgImage.src = itemData.src;
+          }
           renderGalleries();
         };
+
         const delBtn = document.createElement('button');
         delBtn.className = 'delete-btn';
         delBtn.innerText = '✕';
         delBtn.onclick = (e) => {
           e.stopPropagation();
-          if (activeBg && activeBg.src === src) activeBg = null;
+          if (itemData.type === 'video' && bgVideoElement.src === itemData.src) {
+            bgVideoElement.pause();
+            activeBgType = null;
+          } else if (itemData.type === 'image' && activeBgImage && activeBgImage.src === itemData.src) {
+            activeBgImage = null;
+            activeBgType = null;
+          }
           savedBgs.splice(idx, 1);
           renderGalleries();
         };
-        item.appendChild(img);
+
+        item.appendChild(mediaEl);
         item.appendChild(delBtn);
         bgGallery.appendChild(item);
       });
@@ -442,11 +497,22 @@
     document.getElementById('bgLoader').addEventListener('change', (e) => {
       const file = e.target.files[0];
       if (file) {
+        const isVideo = file.type.startsWith('video/');
         const reader = new FileReader();
         reader.onload = (evt) => {
-          savedBgs.push(evt.target.result);
-          activeBg = new Image();
-          activeBg.src = evt.target.result;
+          const bgData = { type: isVideo ? 'video' : 'image', src: evt.target.result };
+          savedBgs.push(bgData);
+          
+          activeBgType = bgData.type;
+          if (isVideo) {
+            activeBgImage = null;
+            bgVideoElement.src = bgData.src;
+            bgVideoElement.play();
+          } else {
+            bgVideoElement.pause();
+            activeBgImage = new Image();
+            activeBgImage.src = bgData.src;
+          }
           renderGalleries();
         };
         reader.readAsDataURL(file);
@@ -479,7 +545,7 @@
       toggleAiCutBtn.classList.toggle('active', isAiCutOn);
     });
 
-    // Configurare MediaPipe Selfie Segmentation
+    // MediaPipe Selfie Segmentation
     const selfieSegmentation = new SelfieSegmentation({
       locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`
     });
@@ -488,7 +554,7 @@
       latestSegmentationMask = results.segmentationMask;
     });
 
-    // Configurare MediaPipe FaceMesh
+    // MediaPipe FaceMesh
     const faceMesh = new FaceMesh({
       locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
     });
@@ -502,14 +568,23 @@
       statusEl.innerText = "Camera Activă 🟢";
       canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
 
-      if (activeBg && activeBg.complete) {
-        canvasCtx.drawImage(activeBg, 0, 0, canvasElement.width, canvasElement.height);
+      // Redare Fundal (Foto sau Video)
+      if (activeBgType === 'video' && bgVideoElement.readyState >= 2) {
+        canvasCtx.drawImage(bgVideoElement, 0, 0, canvasElement.width, canvasElement.height);
+      } else if (activeBgType === 'image' && activeBgImage && activeBgImage.complete) {
+        canvasCtx.drawImage(activeBgImage, 0, 0, canvasElement.width, canvasElement.height);
       } else {
         canvasCtx.fillStyle = '#050811';
         canvasCtx.fillRect(0, 0, canvasElement.width, canvasElement.height);
       }
 
+      // Redare Cameră Reală
       if (showRealCam) {
+        canvasCtx.save();
+        // Oglindire orizontală camera
+        canvasCtx.translate(canvasElement.width, 0);
+        canvasCtx.scale(-1, 1);
+
         if (isAiCutOn && latestSegmentationMask) {
           segmentCtx.clearRect(0, 0, segmentCanvas.width, segmentCanvas.height);
           segmentCtx.drawImage(latestSegmentationMask, 0, 0, segmentCanvas.width, segmentCanvas.height);
@@ -521,8 +596,10 @@
         } else {
           canvasCtx.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
         }
+        canvasCtx.restore();
       }
 
+      // Redare Mască / Avatar Peste Face
       if (latestFaceResults && latestFaceResults.multiFaceLandmarks && latestFaceResults.multiFaceLandmarks.length > 0) {
         const landmarks = latestFaceResults.multiFaceLandmarks[0];
 
@@ -536,14 +613,15 @@
         const rightEye = landmarks[263];
         const nose = landmarks[1];
 
-        const dx = (rightEye.x - leftEye.x) * canvasElement.width;
+        // Se ajustează coordonatele oglindite
+        const dx = (1 - rightEye.x - (1 - leftEye.x)) * canvasElement.width;
         const dy = (rightEye.y - leftEye.y) * canvasElement.height;
         const targetAngle = Math.atan2(dy, dx);
         const targetEyeDist = Math.hypot(dx, dy);
 
         const offX = parseFloat(offsetXSlider.value) + dragOffsetX;
         const offY = parseFloat(offsetYSlider.value) + dragOffsetY;
-        const targetX = nose.x * canvasElement.width + offX;
+        const targetX = (1 - nose.x) * canvasElement.width + offX;
         const targetY = nose.y * canvasElement.height + offY;
 
         smoothX = lerp(smoothX || targetX, targetX, 0.85);
