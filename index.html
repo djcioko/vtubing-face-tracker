@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>VTuber Studio v1.7 - Free-Form Calibration & Persistent State</title>
+  <title>VTuber Studio v1.8 - Extended Zoom & Media Manager</title>
 
   <!-- MediaPipe CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
@@ -114,6 +114,7 @@
       overflow-x: auto;
       padding-bottom: 6px;
       margin-bottom: 6px;
+      min-height: 58px;
     }
 
     .gallery-item {
@@ -128,7 +129,10 @@
       background: #000;
     }
 
-    .gallery-item.active { border-color: #38bdf8; }
+    .gallery-item.active { 
+      border-color: #38bdf8; 
+      box-shadow: 0 0 8px #38bdf8;
+    }
     .gallery-item img, .gallery-item video { width: 100%; height: 100%; object-fit: cover; }
 
     .delete-btn {
@@ -169,7 +173,7 @@
 </head>
 <body>
 
-  <h3>🎭 VTuber Studio v1.7 - Free-Form Size & Orientare Correctă</h3>
+  <h3>🎭 VTuber Studio v1.8 - Unlimited Zoom & Saved Media</h3>
 
   <div class="canvas-container" id="canvasContainer">
     <video id="webcam" playsinline style="display:none;"></video>
@@ -193,7 +197,7 @@
     <div class="section-title">🖼️ / 🎬 FUNDAL SCENĂ (FOTO / VIDEO)</div>
     <div class="btn-group">
       <label class="btn" style="flex: 100%;">
-        ➕ Upload Fundal (Foto / Video)
+        ➕ Upload Fundal Nou
         <input type="file" id="bgLoader" accept="image/*, video/*">
       </label>
     </div>
@@ -203,13 +207,13 @@
     <div class="section-title">👽 AVATAR / MASCĂ PNG</div>
     <div class="btn-group">
       <label class="btn" style="flex: 100%;">
-        ➕ Upload Avatar PNG
+        ➕ Upload Mască Nouă (PNG)
         <input type="file" id="avatarLoader" accept="image/*">
       </label>
     </div>
     <div class="gallery" id="avatarGallery"></div>
 
-    <!-- Corecție Orientare Mască (Inversare/Rotire) -->
+    <!-- Corecție Orientare Mască -->
     <div class="section-title">🔄 ORIENTARE & FLIP MASCĂ</div>
     <div class="btn-group">
       <button id="btnFlipH" class="btn">Oglindire (Flip H)</button>
@@ -220,23 +224,23 @@
       <input type="range" id="rotationSlider" min="0" max="360" step="1" value="0">
     </div>
 
-    <!-- Calibrare Free-Form Size (Ajustare Lățime/Înălțime) -->
-    <div class="section-title">⚙️ CALIBRARE MASCĂ (FREE-FORM SIZE)</div>
+    <!-- Calibrare & Zoom Masiv -->
+    <div class="section-title">⚙️ CALIBRARE MASCĂ (ZOOM 0.1x - 20x)</div>
     <div class="row">
       <label>Scale Lățime (Width):</label>
-      <input type="range" id="scaleWidthSlider" min="0.5" max="6" step="0.1" value="2.8">
+      <input type="range" id="scaleWidthSlider" min="0.1" max="20" step="0.1" value="2.8">
     </div>
     <div class="row">
       <label>Scale Înălțime (Height):</label>
-      <input type="range" id="scaleHeightSlider" min="0.5" max="6" step="0.1" value="2.8">
+      <input type="range" id="scaleHeightSlider" min="0.1" max="20" step="0.1" value="2.8">
     </div>
     <div class="row">
       <label>Offset Mască X:</label>
-      <input type="range" id="offsetXSlider" min="-200" max="200" step="1" value="0">
+      <input type="range" id="offsetXSlider" min="-500" max="500" step="1" value="0">
     </div>
     <div class="row">
       <label>Offset Mască Y:</label>
-      <input type="range" id="offsetYSlider" min="-200" max="200" step="1" value="0">
+      <input type="range" id="offsetYSlider" min="-500" max="500" step="1" value="0">
     </div>
 
     <!-- Calibrare Gură -->
@@ -322,8 +326,8 @@
     let startTouchX = 0;
     let startTouchY = 0;
 
-    let savedBgs = JSON.parse(localStorage.getItem('vtuber_bgs_v17') || '[]');
-    let savedAvatars = JSON.parse(localStorage.getItem('vtuber_avatars_v17') || '[]');
+    let savedBgs = JSON.parse(localStorage.getItem('vtuber_bgs_v18') || '[]');
+    let savedAvatars = JSON.parse(localStorage.getItem('vtuber_avatars_v18') || '[]');
 
     const sliders = [scaleWidthSlider, scaleHeightSlider, rotationSlider, offsetXSlider, offsetYSlider, mouthXSlider, mouthYSlider, mouthWidthSlider, mouthSensSlider];
 
@@ -335,11 +339,11 @@
         activeAvatarIndex: savedAvatars.findIndex(a => activeAvatar && activeAvatar.src === a)
       };
       sliders.forEach(s => state[s.id] = s.value);
-      localStorage.setItem('vtuber_app_state_v17', JSON.stringify(state));
+      localStorage.setItem('vtuber_app_state_v18', JSON.stringify(state));
     }
 
     function loadState() {
-      const saved = JSON.parse(localStorage.getItem('vtuber_app_state_v17') || '{}');
+      const saved = JSON.parse(localStorage.getItem('vtuber_app_state_v18') || '{}');
       
       flipH = saved.flipH || false;
       flipV = saved.flipV || false;
@@ -366,20 +370,34 @@
 
       if (saved.activeBgIndex !== undefined && saved.activeBgIndex >= 0 && savedBgs[saved.activeBgIndex]) {
         const item = savedBgs[saved.activeBgIndex];
-        activeBgType = item.type;
-        if (item.type === 'video') {
-          bgVideoElement.src = item.src;
-          bgVideoElement.play();
-        } else {
-          activeBgImage = new Image();
-          activeBgImage.src = item.src;
-        }
+        selectBg(item);
       }
 
       if (saved.activeAvatarIndex !== undefined && saved.activeAvatarIndex >= 0 && savedAvatars[saved.activeAvatarIndex]) {
-        activeAvatar = new Image();
-        activeAvatar.src = savedAvatars[saved.activeAvatarIndex];
+        selectAvatar(savedAvatars[saved.activeAvatarIndex]);
       }
+    }
+
+    function selectBg(itemData) {
+      activeBgType = itemData.type;
+      if (itemData.type === 'video') {
+        activeBgImage = null;
+        bgVideoElement.src = itemData.src;
+        bgVideoElement.play();
+      } else {
+        bgVideoElement.pause();
+        activeBgImage = new Image();
+        activeBgImage.src = itemData.src;
+      }
+      renderGalleries();
+      saveState();
+    }
+
+    function selectAvatar(src) {
+      activeAvatar = new Image();
+      activeAvatar.src = src;
+      renderGalleries();
+      saveState();
     }
 
     btnFlipH.addEventListener('click', () => {
@@ -399,8 +417,8 @@
       btnCrop.innerText = `AI Crop ${isAiCropOn ? 'ON' : 'OFF'}`;
       btnCrop.classList.toggle('active', isAiCropOn);
       if (isAiCropOn) {
-        scaleWidthSlider.value = 3.5;
-        scaleHeightSlider.value = 3.8;
+        scaleWidthSlider.value = 4.5;
+        scaleHeightSlider.value = 5.0;
       }
       saveState();
     });
@@ -413,12 +431,12 @@
       }
     });
 
-    // Zoom prin rotiță (Ajustează egal ambele scări)
+    // Zoom rapid prin Scroll / Pinch
     canvasContainer.addEventListener('wheel', (e) => {
       e.preventDefault();
-      let step = e.deltaY < 0 ? 0.1 : -0.1;
-      scaleWidthSlider.value = Math.min(Math.max(0.5, parseFloat(scaleWidthSlider.value) + step), 6).toFixed(1);
-      scaleHeightSlider.value = Math.min(Math.max(0.5, parseFloat(scaleHeightSlider.value) + step), 6).toFixed(1);
+      let step = e.deltaY < 0 ? 0.2 : -0.2;
+      scaleWidthSlider.value = Math.min(Math.max(0.1, parseFloat(scaleWidthSlider.value) + step), 20).toFixed(1);
+      scaleHeightSlider.value = Math.min(Math.max(0.1, parseFloat(scaleHeightSlider.value) + step), 20).toFixed(1);
       saveState();
     }, { passive: false });
 
@@ -477,15 +495,15 @@
       dragOffsetY = 0;
       offsetXSlider.value = 0;
       offsetYSlider.value = 0;
-      scaleWidthSlider.value = 3.2;
-      scaleHeightSlider.value = 3.5;
+      scaleWidthSlider.value = 4.0;
+      scaleHeightSlider.value = 4.5;
       saveState();
       statusEl.innerText = "Centrat & Scalat cu succes! 🎯";
     });
 
     function renderGalleries() {
-      localStorage.setItem('vtuber_bgs_v17', JSON.stringify(savedBgs));
-      localStorage.setItem('vtuber_avatars_v17', JSON.stringify(savedAvatars));
+      localStorage.setItem('vtuber_bgs_v18', JSON.stringify(savedBgs));
+      localStorage.setItem('vtuber_avatars_v18', JSON.stringify(savedAvatars));
 
       bgGallery.innerHTML = '';
       savedBgs.forEach((itemData, idx) => {
@@ -499,20 +517,7 @@
         let mediaEl = itemData.type === 'video' ? document.createElement('video') : document.createElement('img');
         mediaEl.src = itemData.src;
 
-        item.onclick = () => {
-          activeBgType = itemData.type;
-          if (itemData.type === 'video') {
-            activeBgImage = null;
-            bgVideoElement.src = itemData.src;
-            bgVideoElement.play();
-          } else {
-            bgVideoElement.pause();
-            activeBgImage = new Image();
-            activeBgImage.src = itemData.src;
-          }
-          saveState();
-          renderGalleries();
-        };
+        item.onclick = () => selectBg(itemData);
 
         const delBtn = document.createElement('button');
         delBtn.className = 'delete-btn';
@@ -520,6 +525,11 @@
         delBtn.onclick = (e) => {
           e.stopPropagation();
           savedBgs.splice(idx, 1);
+          if (isActive) {
+            activeBgType = null;
+            activeBgImage = null;
+            bgVideoElement.src = '';
+          }
           renderGalleries();
           saveState();
         };
@@ -532,23 +542,19 @@
       avatarGallery.innerHTML = '';
       savedAvatars.forEach((src, idx) => {
         const item = document.createElement('div');
-        item.className = 'gallery-item' + (activeAvatar && activeAvatar.src === src ? ' active' : '');
+        const isActive = (activeAvatar && activeAvatar.src === src);
+        item.className = 'gallery-item' + (isActive ? ' active' : '');
         const img = document.createElement('img');
         img.src = src;
 
-        item.onclick = () => {
-          activeAvatar = new Image();
-          activeAvatar.src = src;
-          saveState();
-          renderGalleries();
-        };
+        item.onclick = () => selectAvatar(src);
 
         const delBtn = document.createElement('button');
         delBtn.className = 'delete-btn';
         delBtn.innerText = '✕';
         delBtn.onclick = (e) => {
           e.stopPropagation();
-          if (activeAvatar && activeAvatar.src === src) activeAvatar = null;
+          if (isActive) activeAvatar = null;
           savedAvatars.splice(idx, 1);
           renderGalleries();
           saveState();
@@ -568,18 +574,7 @@
         reader.onload = (evt) => {
           const bgData = { type: isVideo ? 'video' : 'image', src: evt.target.result };
           savedBgs.push(bgData);
-          activeBgType = bgData.type;
-          if (isVideo) {
-            activeBgImage = null;
-            bgVideoElement.src = bgData.src;
-            bgVideoElement.play();
-          } else {
-            bgVideoElement.pause();
-            activeBgImage = new Image();
-            activeBgImage.src = bgData.src;
-          }
-          renderGalleries();
-          saveState();
+          selectBg(bgData);
         };
         reader.readAsDataURL(file);
       }
@@ -591,10 +586,7 @@
         const reader = new FileReader();
         reader.onload = (evt) => {
           savedAvatars.push(evt.target.result);
-          activeAvatar = new Image();
-          activeAvatar.src = evt.target.result;
-          renderGalleries();
-          saveState();
+          selectAvatar(evt.target.result);
         };
         reader.readAsDataURL(file);
       }
