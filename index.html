@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>VTuber Studio v1.3 - Vertical Portrait & Fast Calibration</title>
+  <title>VTuber Studio v1.4 - Square 1:1 Instagram</title>
 
   <!-- MediaPipe CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
@@ -26,12 +26,12 @@
 
     h3 { margin: 4px 0 10px 0; color: #38bdf8; text-align: center; font-size: 16px; }
 
-    /* Format Vertical (Portrait 9:16) */
+    /* Format Patrat 1:1 Instagram */
     .canvas-container {
       position: relative;
       width: 100%;
-      max-width: 360px;
-      aspect-ratio: 9/16;
+      max-width: 400px;
+      aspect-ratio: 1/1;
       border-radius: 12px;
       overflow: hidden;
       border: 2px solid #0284c7;
@@ -52,7 +52,7 @@
 
     .controls-panel {
       width: 100%;
-      max-width: 360px;
+      max-width: 400px;
       margin-top: 10px;
       background: #111827;
       padding: 12px;
@@ -166,7 +166,7 @@
 </head>
 <body>
 
-  <h3>🎭 VTuber Studio v1.3 - Portrait Mode</h3>
+  <h3>🎭 VTuber Studio v1.4 - Square 1:1 Instagram</h3>
 
   <div class="canvas-container" id="canvasContainer">
     <video id="webcam" playsinline style="display:none;"></video>
@@ -204,7 +204,7 @@
     <div class="gallery" id="avatarGallery"></div>
 
     <!-- Calibrare Mască -->
-    <div class="section-title">⚙️️ CALIBRARE MASCĂ (AVATAR)</div>
+    <div class="section-title">⚙️ CALIBRARE MASCĂ (AVATAR)</div>
     <div class="row">
       <label>Scale Avatar (Size):</label>
       <input type="range" id="scaleSlider" min="1" max="5" step="0.1" value="2.8">
@@ -237,7 +237,7 @@
       <input type="range" id="mouthSensSlider" min="1" max="30" step="1" value="15">
     </div>
 
-    <div id="status">Se încarcă modelele AI (v1.3)...</div>
+    <div id="status">Se încarcă modelele AI (v1.4)...</div>
   </div>
 
   <script>
@@ -247,13 +247,13 @@
     const canvasCtx = canvasElement.getContext('2d');
     const statusEl = document.getElementById('status');
 
-    // Canvas optimizat pentru rezoluție portrait (9:16)
-    canvasElement.width = 480;
-    canvasElement.height = 854;
+    // Rezolutie patrata 1:1 (500x500)
+    canvasElement.width = 500;
+    canvasElement.height = 500;
 
     const segmentCanvas = document.createElement('canvas');
-    segmentCanvas.width = 480;
-    segmentCanvas.height = 854;
+    segmentCanvas.width = 500;
+    segmentCanvas.height = 500;
     const segmentCtx = segmentCanvas.getContext('2d');
 
     const toggleShowCamBtn = document.getElementById('toggleShowCam');
@@ -475,7 +475,7 @@
     });
 
     function drawScene() {
-      statusEl.innerText = "v1.3 Portrait Active 🟢";
+      statusEl.innerText = "v1.4 Square 1:1 Active 🟢";
       canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
 
       if (activeBg && activeBg.complete) {
@@ -566,8 +566,8 @@
         }
         await faceMesh.send({image: videoElement});
       },
-      width: 480,
-      height: 854
+      width: 500,
+      height: 500
     });
 
     loadSliderSettings();
