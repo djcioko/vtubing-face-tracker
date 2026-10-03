@@ -2,577 +2,324 @@
 <html lang="ro">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>VTuber Studio v1.4 - Square 1:1 Instagram</title>
-
-  <!-- MediaPipe CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js" crossorigin="anonymous"></script>
-
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VTuber Studio - AI Crop & Interactive Masking</title>
   <style>
-    * { box-sizing: border-box; touch-action: manipulation; }
+    :root {
+      --bg-color: #0c101d;
+      --card-bg: #13192b;
+      --accent-color: #0088ff;
+      --text-color: #ffffff;
+      --border-color: #1e2942;
+    }
+
     body {
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       margin: 0;
-      padding: 10px;
-      background: #090d16;
-      color: #38bdf8;
-      font-family: system-ui, -apple-system, sans-serif;
+      padding: 20px;
       display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-
-    h3 { margin: 4px 0 10px 0; color: #38bdf8; text-align: center; font-size: 16px; }
-
-    /* Format Patrat 1:1 Instagram */
-    .canvas-container {
-      position: relative;
-      width: 100%;
-      max-width: 400px;
-      aspect-ratio: 1/1;
-      border-radius: 12px;
-      overflow: hidden;
-      border: 2px solid #0284c7;
-      background: #000;
-      box-shadow: 0 0 20px rgba(2, 132, 199, 0.2);
-      touch-action: none;
-    }
-
-    video, canvas {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      transform: scaleX(-1);
-    }
-
-    .controls-panel {
-      width: 100%;
-      max-width: 400px;
-      margin-top: 10px;
-      background: #111827;
-      padding: 12px;
-      border-radius: 10px;
-      border: 1px solid #1f2937;
-      font-size: 12px;
-    }
-
-    .section-title {
-      font-weight: bold;
-      color: #94a3b8;
-      margin: 10px 0 6px 0;
-      border-bottom: 1px solid #1e293b;
-      padding-bottom: 2px;
-    }
-
-    .btn-group {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      margin-bottom: 8px;
-    }
-
-    .btn {
-      flex: 1 1 calc(50% - 6px);
-      padding: 8px;
-      background: #1e293b;
-      border: 1px solid #0284c7;
-      color: #38bdf8;
-      border-radius: 6px;
-      cursor: pointer;
-      font-weight: bold;
-      text-align: center;
-      font-size: 11px;
-    }
-
-    .btn.active {
-      background: #0284c7;
-      color: #fff;
-    }
-
-    input[type="file"] { display: none; }
-
-    .gallery {
-      display: flex;
-      gap: 8px;
-      overflow-x: auto;
-      padding-bottom: 6px;
-      margin-bottom: 6px;
-    }
-
-    .gallery-item {
-      position: relative;
-      width: 50px;
-      height: 50px;
-      border-radius: 6px;
-      border: 2px solid #334155;
-      overflow: hidden;
-      flex-shrink: 0;
-      cursor: pointer;
-    }
-
-    .gallery-item.active {
-      border-color: #38bdf8;
-    }
-
-    .gallery-item img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-
-    .delete-btn {
-      position: absolute;
-      top: 1px;
-      right: 1px;
-      background: #ef4444;
-      color: white;
-      border: none;
-      border-radius: 50%;
-      width: 16px;
-      height: 16px;
-      font-size: 9px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
       justify-content: center;
     }
 
-    .row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 6px;
+    .container {
+      width: 100%;
+      max-width: 480px;
+      background: var(--card-bg);
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+      border: 1px solid var(--border-color);
     }
 
-    label { color: #94a3b8; }
-
-    input[type="range"] {
-      width: 55%;
-      accent-color: #38bdf8;
-    }
-
-    #status {
-      font-size: 11px;
-      color: #22c55e;
+    .header-title {
       text-align: center;
-      margin-top: 6px;
+      font-weight: 600;
+      font-size: 16px;
+      margin-bottom: 12px;
+      color: #38ef7d;
+    }
+
+    /* Zona de afișare video / mască */
+    .viewport {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      background: #05070d;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 2px solid var(--accent-color);
+      user-select: none;
+      touch-action: none;
+      cursor: grab;
+    }
+
+    .viewport:active {
+      cursor: grabbing;
+    }
+
+    /* Layer-ul cu corpul real / fundalul */
+    .background-layer {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+
+    /* Containerul măștii avatarului cu suport pentru drag & zoom */
+    .avatar-wrapper {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform-origin: center center;
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    .avatar-image {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    /* Stiluri modul AI Crop active */
+    .avatar-wrapper.ai-crop-on .avatar-image {
+      object-fit: cover;
+      min-width: 120%;
+      min-height: 120%;
+    }
+
+    /* Panou Butoane de Control Superior */
+    .button-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .btn {
+      background: #1c2640;
+      color: #fff;
+      border: 1px solid #2a3a60;
+      padding: 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-align: center;
+    }
+
+    .btn:hover {
+      background: var(--accent-color);
+    }
+
+    .btn.active {
+      background: #0088ff;
+      border-color: #00aaff;
+    }
+
+    .btn-fullscreen {
+      grid-column: span 2;
+      background: #28a745;
+      border-color: #34ce57;
+    }
+
+    .btn-fullscreen:hover {
+      background: #218838;
+    }
+
+    /* Controale Glisante (Sliders) */
+    .control-group {
+      margin-top: 16px;
+    }
+
+    .control-title {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #8a99ad;
+      margin-bottom: 10px;
+    }
+
+    .slider-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-size: 12px;
+    }
+
+    .slider-row label {
+      width: 40%;
+      color: #c3d1e0;
+    }
+
+    .slider-row input[type="range"] {
+      width: 58%;
+      accent-color: var(--accent-color);
+    }
+
+    .info-overlay {
+      position: absolute;
+      bottom: 8px;
+      left: 8px;
+      background: rgba(0, 0, 0, 0.6);
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 10px;
+      color: #aaa;
+      z-index: 10;
     }
   </style>
 </head>
 <body>
 
-  <h3>🎭 VTuber Studio v1.4 - Square 1:1 Instagram</h3>
+<div class="container" id="mainContainer">
+  <div class="header-title">VTuber Studio v1.5 - Interactive Calibration</div>
 
-  <div class="canvas-container" id="canvasContainer">
-    <video id="webcam" playsinline style="display:none;"></video>
-    <canvas id="output_canvas"></canvas>
+  <!-- Ecranul Principal Visual -->
+  <div class="viewport" id="viewport">
+    <div class="info-overlay">Trage cu mouse-ul pentru mutare | Rotiță pt. Zoom</div>
+    
+    <!-- Fundal / Cameră -->
+    <img src="https://via.placeholder.com/600x600/111827/ffffff?text=Fundal+Scen%C4%83" class="background-layer" id="bgLayer" alt="Fundal">
+    
+    <!-- Masca Avatar cu suport de transformare -->
+    <div class="avatar-wrapper ai-crop-on" id="avatarWrapper">
+      <img src="https://via.placeholder.com/400x400/0088ff/ffffff?text=Avatar+PNG" class="avatar-image" id="avatarImg" alt="Avatar PNG">
+    </div>
   </div>
 
-  <div class="controls-panel">
-    
-    <!-- Toggles & Quick Actions -->
-    <div class="btn-group">
-      <button id="toggleShowCam" class="btn">Camera Reala: OFF</button>
-      <button id="toggleAiCut" class="btn">AI Cut-Off: OFF</button>
-      <button id="autoCalibrateBtn" class="btn">🎯 Autocalibrare Centru</button>
-      <button id="resetTouchBtn" class="btn">Reset Pozitie Touch</button>
-    </div>
-
-    <!-- Galerie Fundaluri -->
-    <div class="section-title">🖼 FUNDAL SCENĂ</div>
-    <div class="btn-group">
-      <label class="btn" style="flex: 100%;">
-        ➕ Upload Fundal
-        <input type="file" id="bgLoader" accept="image/*">
-      </label>
-    </div>
-    <div class="gallery" id="bgGallery"></div>
-
-    <!-- Galerie Avatare -->
-    <div class="section-title">👽 AVATAR / MASCĂ</div>
-    <div class="btn-group">
-      <label class="btn" style="flex: 100%;">
-        ➕ Upload Avatar
-        <input type="file" id="avatarLoader" accept="image/*">
-      </label>
-    </div>
-    <div class="gallery" id="avatarGallery"></div>
-
-    <!-- Calibrare Mască -->
-    <div class="section-title">⚙️ CALIBRARE MASCĂ (AVATAR)</div>
-    <div class="row">
-      <label>Scale Avatar (Size):</label>
-      <input type="range" id="scaleSlider" min="1" max="5" step="0.1" value="2.8">
-    </div>
-    <div class="row">
-      <label>Offset Mască X:</label>
-      <input type="range" id="offsetXSlider" min="-150" max="150" step="1" value="0">
-    </div>
-    <div class="row">
-      <label>Offset Mască Y:</label>
-      <input type="range" id="offsetYSlider" min="-150" max="150" step="1" value="0">
-    </div>
-
-    <!-- Calibrare Gură -->
-    <div class="section-title">👄 AJUSTARE FINĂ GURĂ</div>
-    <div class="row">
-      <label>Fine-Tune Gură X:</label>
-      <input type="range" id="mouthXSlider" min="-100" max="100" step="1" value="0">
-    </div>
-    <div class="row">
-      <label>Fine-Tune Gură Y:</label>
-      <input type="range" id="mouthYSlider" min="-100" max="100" step="1" value="0">
-    </div>
-    <div class="row">
-      <label>Lățime Gură (Width):</label>
-      <input type="range" id="mouthWidthSlider" min="10" max="120" step="1" value="40">
-    </div>
-    <div class="row">
-      <label>Sensibilitate Deschidere Gură:</label>
-      <input type="range" id="mouthSensSlider" min="1" max="30" step="1" value="15">
-    </div>
-
-    <div id="status">Se încarcă modelele AI (v1.4)...</div>
+  <!-- Comenzi Superioare -->
+  <div class="button-grid">
+    <button class="btn active" id="btnAiCrop" onclick="toggleAiCrop()">AI Crop & Fit: ON</button>
+    <button class="btn" onclick="resetTransform()">Reset Poziție</button>
+    <button class="btn btn-fullscreen" onclick="toggleFullScreen()">🖥️ Mod Ecran Complet (Full Screen)</button>
   </div>
 
-  <script>
-    const videoElement = document.getElementById('webcam');
-    const canvasElement = document.getElementById('output_canvas');
-    const canvasContainer = document.getElementById('canvasContainer');
-    const canvasCtx = canvasElement.getContext('2d');
-    const statusEl = document.getElementById('status');
-
-    // Rezolutie patrata 1:1 (500x500)
-    canvasElement.width = 500;
-    canvasElement.height = 500;
-
-    const segmentCanvas = document.createElement('canvas');
-    segmentCanvas.width = 500;
-    segmentCanvas.height = 500;
-    const segmentCtx = segmentCanvas.getContext('2d');
-
-    const toggleShowCamBtn = document.getElementById('toggleShowCam');
-    const toggleAiCutBtn = document.getElementById('toggleAiCut');
-    const resetTouchBtn = document.getElementById('resetTouchBtn');
-    const autoCalibrateBtn = document.getElementById('autoCalibrateBtn');
-
-    const scaleSlider = document.getElementById('scaleSlider');
-    const offsetXSlider = document.getElementById('offsetXSlider');
-    const offsetYSlider = document.getElementById('offsetYSlider');
-
-    const mouthXSlider = document.getElementById('mouthXSlider');
-    const mouthYSlider = document.getElementById('mouthYSlider');
-    const mouthWidthSlider = document.getElementById('mouthWidthSlider');
-    const mouthSensSlider = document.getElementById('mouthSensSlider');
-
-    const bgGallery = document.getElementById('bgGallery');
-    const avatarGallery = document.getElementById('avatarGallery');
-
-    let showRealCam = false;
-    let isAiCutOn = false;
-    let latestSegmentationMask = null;
-    let latestFaceResults = null;
-
-    let activeBg = null;
-    let activeAvatar = null;
-
-    let smoothX = 0, smoothY = 0, smoothAngle = 0, smoothEyeDist = 0;
-    const lerp = (start, end, amt) => (1 - amt) * start + amt * end;
-
-    let dragOffsetX = 0;
-    let dragOffsetY = 0;
-    let isDragging = false;
-    let startTouchX = 0;
-    let startTouchY = 0;
-
-    let savedBgs = JSON.parse(localStorage.getItem('vtuber_bgs') || '[]');
-    let savedAvatars = JSON.parse(localStorage.getItem('vtuber_avatars') || '[]');
-
-    const sliders = [scaleSlider, offsetXSlider, offsetYSlider, mouthXSlider, mouthYSlider, mouthWidthSlider, mouthSensSlider];
+  <!-- Controale de Calibrare -->
+  <div class="control-group">
+    <div class="control-title">⚙️ Calibrare Mască & Zoom</div>
     
-    function saveSliderSettings() {
-      const settings = {};
-      sliders.forEach(s => settings[s.id] = s.value);
-      localStorage.setItem('vtuber_slider_settings', JSON.stringify(settings));
-    }
+    <div class="slider-row">
+      <label for="scaleSlider">Scală / Zoom Avatar:</label>
+      <input type="range" id="scaleSlider" min="0.5" max="3" step="0.05" value="1.2" oninput="updateFromSliders()">
+    </div>
 
-    function loadSliderSettings() {
-      const saved = JSON.parse(localStorage.getItem('vtuber_slider_settings') || '{}');
-      sliders.forEach(s => {
-        if (saved[s.id] !== undefined) s.value = saved[s.id];
-        s.addEventListener('input', saveSliderSettings);
+    <div class="slider-row">
+      <label for="offsetXSlider">Poziție X (Orizontal):</label>
+      <input type="range" id="offsetXSlider" min="-200" max="200" value="0" oninput="updateFromSliders()">
+    </div>
+
+    <div class="slider-row">
+      <label for="offsetYSlider">Poziție Y (Vertical):</label>
+      <input type="range" id="offsetYSlider" min="-200" max="200" value="0" oninput="updateFromSliders()">
+    </div>
+  </div>
+</div>
+
+<script>
+  // Starea transformării
+  let scale = 1.2;
+  let posX = 0;
+  let posY = 0;
+  let isAiCropOn = true;
+
+  const avatarWrapper = document.getElementById('avatarWrapper');
+  const viewport = document.getElementById('viewport');
+  const scaleSlider = document.getElementById('scaleSlider');
+  const offsetXSlider = document.getElementById('offsetXSlider');
+  const offsetYSlider = document.getElementById('offsetYSlider');
+  const btnAiCrop = document.getElementById('btnAiCrop');
+
+  // Actualizează proprietățile vizuale ale avatarului
+  function applyTransform() {
+    avatarWrapper.style.transform = `translate(-50%, -50%) translate(${posX}px, ${posY}px) scale(${scale})`;
+    scaleSlider.value = scale;
+    offsetXSlider.value = posX;
+    offsetYSlider.value = posY;
+  }
+
+  function updateFromSliders() {
+    scale = parseFloat(scaleSlider.value);
+    posX = parseInt(offsetXSlider.value);
+    posY = parseInt(offsetYSlider.value);
+    applyTransform();
+  }
+
+  // Comutare AI Crop / Auto Fit
+  function toggleAiCrop() {
+    isAiCropOn = !isAiCropOn;
+    if (isAiCropOn) {
+      avatarWrapper.classList.add('ai-crop-on');
+      btnAiCrop.classList.add('active');
+      btnAiCrop.innerText = 'AI Crop & Fit: ON';
+      scale = 1.2;
+    } else {
+      avatarWrapper.classList.remove('ai-crop-on');
+      btnAiCrop.classList.remove('active');
+      btnAiCrop.innerText = 'AI Crop & Fit: OFF';
+      scale = 1.0;
+    }
+    applyTransform();
+  }
+
+  // Resetare poziție
+  function resetTransform() {
+    scale = isAiCropOn ? 1.2 : 1.0;
+    posX = 0;
+    posY = 0;
+    applyTransform();
+  }
+
+  // Interacțiune prin Dragging (Mouse și Touch)
+  let isDragging = false;
+  let startX, startY;
+
+  viewport.addEventListener('mousedown', (e) => {
+    isDragging = true;
+    startX = e.clientX - posX;
+    startY = e.clientY - posY;
+  });
+
+  window.addEventListener('mousemove', (e) => {
+    if (!isDragging) return;
+    posX = e.clientX - startX;
+    posY = e.clientY - startY;
+    applyTransform();
+  });
+
+  window.addEventListener('mouseup', () => { isDragging = false; });
+
+  // Zoom prin Rotița Mouse-ului
+  viewport.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const zoomFactor = e.deltaY < 0 ? 0.05 : -0.05;
+    scale = Math.min(Math.max(0.5, scale + zoomFactor), 3.0);
+    applyTransform();
+  }, { passive: false });
+
+  // Ecran Complet (Full Screen)
+  function toggleFullScreen() {
+    if (!document.fullscreenElement) {
+      document.getElementById('mainContainer').requestFullscreen().catch(err => {
+        alert(`Eroare activare Full Screen: ${err.message}`);
       });
+    } else {
+      document.exitFullscreen();
     }
+  }
 
-    // Touch & Drag Handling
-    function handlePointerDown(clientX, clientY) {
-      isDragging = true;
-      startTouchX = clientX;
-      startTouchY = clientY;
-    }
+  // Inițializare
+  applyTransform();
+</script>
 
-    function handlePointerMove(clientX, clientY) {
-      if (!isDragging) return;
-      const rect = canvasContainer.getBoundingClientRect();
-      const deltaX = - (clientX - startTouchX) * (canvasElement.width / rect.width);
-      const deltaY = (clientY - startTouchY) * (canvasElement.height / rect.height);
-
-      dragOffsetX += deltaX;
-      dragOffsetY += deltaY;
-
-      startTouchX = clientX;
-      startTouchY = clientY;
-    }
-
-    function handlePointerUp() { isDragging = false; }
-
-    canvasContainer.addEventListener('mousedown', (e) => handlePointerDown(e.clientX, e.clientY));
-    window.addEventListener('mousemove', (e) => handlePointerMove(e.clientX, e.clientY));
-    window.addEventListener('mouseup', handlePointerUp);
-
-    canvasContainer.addEventListener('touchstart', (e) => {
-      if (e.touches.length === 1) handlePointerDown(e.touches[0].clientX, e.touches[0].clientY);
-    }, { passive: true });
-
-    window.addEventListener('touchmove', (e) => {
-      if (e.touches.length === 1) handlePointerMove(e.touches[0].clientX, e.touches[0].clientY);
-    }, { passive: true });
-
-    window.addEventListener('touchend', handlePointerUp);
-
-    resetTouchBtn.addEventListener('click', () => {
-      dragOffsetX = 0;
-      dragOffsetY = 0;
-      offsetXSlider.value = 0;
-      offsetYSlider.value = 0;
-      saveSliderSettings();
-    });
-
-    autoCalibrateBtn.addEventListener('click', () => {
-      dragOffsetX = 0;
-      dragOffsetY = 0;
-      offsetXSlider.value = 0;
-      offsetYSlider.value = 0;
-      saveSliderSettings();
-      statusEl.innerText = "Centrat cu succes! 🎯";
-    });
-
-    function renderGalleries() {
-      localStorage.setItem('vtuber_bgs', JSON.stringify(savedBgs));
-      localStorage.setItem('vtuber_avatars', JSON.stringify(savedAvatars));
-
-      bgGallery.innerHTML = '';
-      savedBgs.forEach((src, idx) => {
-        const item = document.createElement('div');
-        item.className = 'gallery-item' + (activeBg && activeBg.src === src ? ' active' : '');
-        const img = document.createElement('img');
-        img.src = src;
-        img.onclick = () => {
-          activeBg = new Image();
-          activeBg.src = src;
-          renderGalleries();
-        };
-        const delBtn = document.createElement('button');
-        delBtn.className = 'delete-btn';
-        delBtn.innerText = '✕';
-        delBtn.onclick = (e) => {
-          e.stopPropagation();
-          if (activeBg && activeBg.src === src) activeBg = null;
-          savedBgs.splice(idx, 1);
-          renderGalleries();
-        };
-        item.appendChild(img);
-        item.appendChild(delBtn);
-        bgGallery.appendChild(item);
-      });
-
-      avatarGallery.innerHTML = '';
-      savedAvatars.forEach((src, idx) => {
-        const item = document.createElement('div');
-        item.className = 'gallery-item' + (activeAvatar && activeAvatar.src === src ? ' active' : '');
-        const img = document.createElement('img');
-        img.src = src;
-        img.onclick = () => {
-          activeAvatar = new Image();
-          activeAvatar.src = src;
-          renderGalleries();
-        };
-        const delBtn = document.createElement('button');
-        delBtn.className = 'delete-btn';
-        delBtn.innerText = '✕';
-        delBtn.onclick = (e) => {
-          e.stopPropagation();
-          if (activeAvatar && activeAvatar.src === src) activeAvatar = null;
-          savedAvatars.splice(idx, 1);
-          renderGalleries();
-        };
-        item.appendChild(img);
-        item.appendChild(delBtn);
-        avatarGallery.appendChild(item);
-      });
-    }
-
-    document.getElementById('bgLoader').addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = (evt) => {
-          savedBgs.push(evt.target.result);
-          activeBg = new Image();
-          activeBg.src = evt.target.result;
-          renderGalleries();
-        };
-        reader.readAsDataURL(file);
-      }
-    });
-
-    document.getElementById('avatarLoader').addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = (evt) => {
-          savedAvatars.push(evt.target.result);
-          activeAvatar = new Image();
-          activeAvatar.src = evt.target.result;
-          renderGalleries();
-        };
-        reader.readAsDataURL(file);
-      }
-    });
-
-    toggleShowCamBtn.addEventListener('click', () => {
-      showRealCam = !showRealCam;
-      toggleShowCamBtn.innerText = `Camera Reala: ${showRealCam ? 'ON' : 'OFF'}`;
-      toggleShowCamBtn.classList.toggle('active', showRealCam);
-    });
-
-    toggleAiCutBtn.addEventListener('click', () => {
-      isAiCutOn = !isAiCutOn;
-      toggleAiCutBtn.innerText = `AI Cut-Off: ${isAiCutOn ? 'ON' : 'OFF'}`;
-      toggleAiCutBtn.classList.toggle('active', isAiCutOn);
-    });
-
-    const selfieSegmentation = new SelfieSegmentation({
-      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`
-    });
-    selfieSegmentation.setOptions({ modelSelection: 1 });
-    selfieSegmentation.onResults((results) => {
-      latestSegmentationMask = results.segmentationMask;
-    });
-
-    const faceMesh = new FaceMesh({
-      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
-    });
-    faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
-    faceMesh.onResults((results) => {
-      latestFaceResults = results;
-      drawScene();
-    });
-
-    function drawScene() {
-      statusEl.innerText = "v1.4 Square 1:1 Active 🟢";
-      canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-
-      if (activeBg && activeBg.complete) {
-        canvasCtx.drawImage(activeBg, 0, 0, canvasElement.width, canvasElement.height);
-      } else {
-        canvasCtx.fillStyle = '#050811';
-        canvasCtx.fillRect(0, 0, canvasElement.width, canvasElement.height);
-      }
-
-      if (showRealCam) {
-        if (isAiCutOn && latestSegmentationMask) {
-          segmentCtx.clearRect(0, 0, segmentCanvas.width, segmentCanvas.height);
-          segmentCtx.drawImage(latestSegmentationMask, 0, 0, segmentCanvas.width, segmentCanvas.height);
-          segmentCtx.globalCompositeOperation = 'source-in';
-          segmentCtx.drawImage(videoElement, 0, 0, segmentCanvas.width, segmentCanvas.height);
-          segmentCtx.globalCompositeOperation = 'source-over';
-
-          canvasCtx.drawImage(segmentCanvas, 0, 0, canvasElement.width, canvasElement.height);
-        } else {
-          canvasCtx.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
-        }
-      }
-
-      if (latestFaceResults && latestFaceResults.multiFaceLandmarks && latestFaceResults.multiFaceLandmarks.length > 0) {
-        const landmarks = latestFaceResults.multiFaceLandmarks[0];
-
-        const lipTop = landmarks[13];
-        const lipBottom = landmarks[14];
-        const jawDist = Math.hypot(lipTop.x - lipBottom.x, lipTop.y - lipBottom.y);
-        const sens = parseFloat(mouthSensSlider.value);
-        const jawOpenValue = Math.min(Math.max((jawDist - 0.015) * sens, 0), 1);
-
-        const leftEye = landmarks[33];
-        const rightEye = landmarks[263];
-        const nose = landmarks[1];
-
-        const dx = (rightEye.x - leftEye.x) * canvasElement.width;
-        const dy = (rightEye.y - leftEye.y) * canvasElement.height;
-        const targetAngle = Math.atan2(dy, dx);
-        const targetEyeDist = Math.hypot(dx, dy);
-
-        const offX = parseFloat(offsetXSlider.value) + dragOffsetX;
-        const offY = parseFloat(offsetYSlider.value) + dragOffsetY;
-        const targetX = nose.x * canvasElement.width + offX;
-        const targetY = nose.y * canvasElement.height + offY;
-
-        smoothX = lerp(smoothX || targetX, targetX, 0.85);
-        smoothY = lerp(smoothY || targetY, targetY, 0.85);
-        smoothAngle = lerp(smoothAngle || targetAngle, targetAngle, 0.85);
-        smoothEyeDist = lerp(smoothEyeDist || targetEyeDist, targetEyeDist, 0.85);
-
-        const scale = parseFloat(scaleSlider.value);
-        const maskWidth = smoothEyeDist * scale;
-        const maskHeight = maskWidth;
-
-        if (activeAvatar && activeAvatar.complete) {
-          canvasCtx.save();
-          canvasCtx.translate(smoothX, smoothY);
-          canvasCtx.rotate(smoothAngle);
-
-          canvasCtx.drawImage(activeAvatar, -maskWidth / 2, -maskHeight / 2, maskWidth, maskHeight);
-
-          const lipCenterY = (lipTop.y + lipBottom.y) / 2;
-          const autoMouthY = (lipCenterY - nose.y) * canvasElement.height;
-
-          const fineX = parseFloat(mouthXSlider.value);
-          const fineY = parseFloat(mouthYSlider.value);
-          const finalMouthX = fineX;
-          const finalMouthY = autoMouthY + fineY;
-
-          const mWidth = parseFloat(mouthWidthSlider.value);
-          const mouthOpenH = Math.max(2, jawOpenValue * 25);
-
-          canvasCtx.beginPath();
-          canvasCtx.ellipse(finalMouthX, finalMouthY, mWidth / 2, mouthOpenH / 2, 0, 0, Math.PI * 2);
-          canvasCtx.fillStyle = '#050811';
-          canvasCtx.fill();
-
-          canvasCtx.restore();
-        }
-      }
-    }
-
-    const camera = new Camera(videoElement, {
-      onFrame: async () => {
-        if (isAiCutOn && showRealCam) {
-          await selfieSegmentation.send({image: videoElement});
-        }
-        await faceMesh.send({image: videoElement});
-      },
-      width: 500,
-      height: 500
-    });
-
-    loadSliderSettings();
-    renderGalleries();
-    camera.start();
-  </script>
 </body>
 </html>
