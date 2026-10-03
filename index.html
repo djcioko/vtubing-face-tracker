@@ -3,63 +3,70 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>VTuber Studio - AI Crop & Interactive Masking</title>
+  <title>VTuber Studio v1.5 - Full Control & Calibration</title>
   <style>
     :root {
-      --bg-color: #0c101d;
-      --card-bg: #13192b;
+      --bg-color: #0b0f19;
+      --card-bg: #111827;
+      --panel-bg: #1f2937;
       --accent-color: #0088ff;
+      --accent-hover: #0066cc;
       --text-color: #ffffff;
-      --border-color: #1e2942;
+      --text-muted: #9ca3af;
+      --border-color: #374151;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
     }
 
     body {
       background-color: var(--bg-color);
       color: var(--text-color);
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      margin: 0;
-      padding: 20px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       display: flex;
       justify-content: center;
+      padding: 16px;
     }
 
-    .container {
+    .app-card {
       width: 100%;
-      max-width: 480px;
+      max-width: 440px;
       background: var(--card-bg);
       border-radius: 12px;
-      padding: 16px;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
       border: 1px solid var(--border-color);
+      padding: 16px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
     }
 
-    .header-title {
+    .app-title {
       text-align: center;
-      font-weight: 600;
-      font-size: 16px;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--accent-color);
       margin-bottom: 12px;
-      color: #38ef7d;
     }
 
-    /* Zona de afișare video / mască */
+    /* Zona de vizualizare / Display Canvas */
     .viewport {
       position: relative;
       width: 100%;
       aspect-ratio: 1 / 1;
-      background: #05070d;
+      background: #000;
       border-radius: 8px;
       overflow: hidden;
       border: 2px solid var(--accent-color);
-      user-select: none;
-      touch-action: none;
       cursor: grab;
+      touch-action: none;
+      user-select: none;
     }
 
     .viewport:active {
       cursor: grabbing;
     }
 
-    /* Layer-ul cu corpul real / fundalul */
     .background-layer {
       position: absolute;
       width: 100%;
@@ -70,95 +77,132 @@
       z-index: 1;
     }
 
-    /* Containerul măștii avatarului cu suport pentru drag & zoom */
-    .avatar-wrapper {
+    .avatar-container {
       position: absolute;
       top: 50%;
       left: 50%;
-      transform-origin: center center;
       z-index: 2;
+      transform-origin: center center;
       pointer-events: none;
     }
 
     .avatar-image {
+      display: block;
       width: 100%;
       height: 100%;
-      object-fit: cover;
-      display: block;
+      object-fit: contain;
     }
 
-    /* Stiluri modul AI Crop active */
-    .avatar-wrapper.ai-crop-on .avatar-image {
+    .avatar-container.ai-crop-on .avatar-image {
       object-fit: cover;
       min-width: 120%;
       min-height: 120%;
     }
 
-    /* Panou Butoane de Control Superior */
-    .button-grid {
+    /* Meniu Comenzi & Butoane */
+    .btn-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 8px;
-      margin-top: 14px;
+      margin-top: 12px;
     }
 
     .btn {
-      background: #1c2640;
+      background: var(--panel-bg);
       color: #fff;
-      border: 1px solid #2a3a60;
-      padding: 10px;
+      border: 1px solid var(--border-color);
+      padding: 8px 12px;
       border-radius: 6px;
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 600;
       cursor: pointer;
-      transition: all 0.2s ease;
       text-align: center;
+      transition: all 0.2s;
     }
 
     .btn:hover {
-      background: var(--accent-color);
+      background: var(--accent-hover);
     }
 
     .btn.active {
-      background: #0088ff;
-      border-color: #00aaff;
+      background: var(--accent-color);
+      border-color: #60a5fa;
+    }
+
+    .btn-full {
+      grid-column: span 2;
     }
 
     .btn-fullscreen {
-      grid-column: span 2;
-      background: #28a745;
-      border-color: #34ce57;
+      background: #10b981;
+      border-color: #059669;
     }
 
     .btn-fullscreen:hover {
-      background: #218838;
+      background: #059669;
     }
 
-    /* Controale Glisante (Sliders) */
-    .control-group {
-      margin-top: 16px;
-    }
-
-    .control-title {
-      font-size: 12px;
+    /* Secțiuni Încarcare & Calibrare */
+    .section-title {
+      font-size: 11px;
       font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
-      color: #8a99ad;
-      margin-bottom: 10px;
+      color: var(--text-muted);
+      margin: 14px 0 8px 0;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .upload-zone {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .file-input-hidden {
+      display: none;
+    }
+
+    .upload-btn {
+      display: block;
+      width: 100%;
+      padding: 8px;
+      background: #1f2937;
+      border: 1px dashed var(--accent-color);
+      border-radius: 6px;
+      color: var(--accent-color);
+      text-align: center;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .preview-thumb {
+      width: 40px;
+      height: 40px;
+      border-radius: 6px;
+      object-fit: cover;
+      border: 1px solid var(--border-color);
+    }
+
+    /* Glisoare (Sliders) */
+    .slider-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
     }
 
     .slider-row {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 8px;
-      font-size: 12px;
+      font-size: 11px;
     }
 
     .slider-row label {
+      color: #d1d5db;
       width: 40%;
-      color: #c3d1e0;
     }
 
     .slider-row input[type="range"] {
@@ -166,82 +210,111 @@
       accent-color: var(--accent-color);
     }
 
-    .info-overlay {
-      position: absolute;
-      bottom: 8px;
-      left: 8px;
-      background: rgba(0, 0, 0, 0.6);
-      padding: 4px 8px;
-      border-radius: 4px;
+    .status-bar {
+      margin-top: 12px;
+      text-align: center;
       font-size: 10px;
-      color: #aaa;
-      z-index: 10;
+      color: #10b981;
     }
   </style>
 </head>
 <body>
 
-<div class="container" id="mainContainer">
-  <div class="header-title">VTuber Studio v1.5 - Interactive Calibration</div>
+<div class="app-card" id="appCard">
+  <div class="app-title">VTuber Studio v1.5 - Square 1:1</div>
 
-  <!-- Ecranul Principal Visual -->
+  <!-- Zona de Afișare Principala (Ecran/Camera) -->
   <div class="viewport" id="viewport">
-    <div class="info-overlay">Trage cu mouse-ul pentru mutare | Rotiță pt. Zoom</div>
-    
-    <!-- Fundal / Cameră -->
-    <img src="https://via.placeholder.com/600x600/111827/ffffff?text=Fundal+Scen%C4%83" class="background-layer" id="bgLayer" alt="Fundal">
-    
-    <!-- Masca Avatar cu suport de transformare -->
-    <div class="avatar-wrapper ai-crop-on" id="avatarWrapper">
-      <img src="https://via.placeholder.com/400x400/0088ff/ffffff?text=Avatar+PNG" class="avatar-image" id="avatarImg" alt="Avatar PNG">
+    <img src="https://via.placeholder.com/600x600/111827/ffffff?text=Fundal+Scena" id="bgLayer" class="background-layer" alt="Fundal">
+    <div class="avatar-container ai-crop-on" id="avatarContainer">
+      <img src="https://via.placeholder.com/400x400/0088ff/ffffff?text=Upload+Avatar+PNG" id="avatarImg" class="avatar-image" alt="Avatar PNG">
     </div>
   </div>
 
-  <!-- Comenzi Superioare -->
-  <div class="button-grid">
-    <button class="btn active" id="btnAiCrop" onclick="toggleAiCrop()">AI Crop & Fit: ON</button>
-    <button class="btn" onclick="resetTransform()">Reset Poziție</button>
-    <button class="btn btn-fullscreen" onclick="toggleFullScreen()">🖥️ Mod Ecran Complet (Full Screen)</button>
+  <!-- Butoane Principale & Comenzi -->
+  <div class="btn-grid">
+    <button class="btn active" id="btnCamera" onclick="toggleCamera()">Camera Reală: ON</button>
+    <button class="btn active" id="btnAiCrop" onclick="toggleAiCrop()">AI Cut-Off / Crop: ON</button>
+    <button class="btn" onclick="autoCalibrateCenter()">Autocalibrare Centru</button>
+    <button class="btn" onclick="resetTransform()">Reset Poziție Touch</button>
+    <button class="btn btn-full btn-fullscreen" onclick="toggleFullScreen()">🖥️ Intrare / Ieșire Full Screen</button>
   </div>
 
-  <!-- Controale de Calibrare -->
-  <div class="control-group">
-    <div class="control-title">⚙️ Calibrare Mască & Zoom</div>
-    
+  <!-- Incarcare Fundal Scenă -->
+  <div class="section-title">🖼️ Fundal Scenă</div>
+  <div class="upload-zone">
+    <label class="upload-btn" for="bgInput">+ Upload Fundal</label>
+    <input type="file" id="bgInput" class="file-input-hidden" accept="image/*" onchange="loadBackground(event)">
+  </div>
+
+  <!-- Incarcare Avatar / Mască PNG -->
+  <div class="section-title">🎭 Avatar / Mască PNG</div>
+  <div class="upload-zone">
+    <label class="upload-btn" for="avatarInput">+ Upload Avatar PNG</label>
+    <input type="file" id="avatarInput" class="file-input-hidden" accept="image/png, image/*" onchange="loadAvatar(event)">
+  </div>
+
+  <!-- Calibrare Mască -->
+  <div class="section-title">⚙️ Calibrare Mască (Avatar)</div>
+  <div class="slider-group">
     <div class="slider-row">
-      <label for="scaleSlider">Scală / Zoom Avatar:</label>
+      <label>Scale Avatar (Size):</label>
       <input type="range" id="scaleSlider" min="0.5" max="3" step="0.05" value="1.2" oninput="updateFromSliders()">
     </div>
-
     <div class="slider-row">
-      <label for="offsetXSlider">Poziție X (Orizontal):</label>
+      <label>Offset Mască X:</label>
       <input type="range" id="offsetXSlider" min="-200" max="200" value="0" oninput="updateFromSliders()">
     </div>
-
     <div class="slider-row">
-      <label for="offsetYSlider">Poziție Y (Vertical):</label>
+      <label>Offset Mască Y:</label>
       <input type="range" id="offsetYSlider" min="-200" max="200" value="0" oninput="updateFromSliders()">
     </div>
   </div>
+
+  <!-- Ajustare Fină Gură -->
+  <div class="section-title">👄 Ajustare Fină Gură</div>
+  <div class="slider-group">
+    <div class="slider-row">
+      <label>Fine-Tune Gură X:</label>
+      <input type="range" min="-50" max="50" value="0">
+    </div>
+    <div class="slider-row">
+      <label>Fine-Tune Gură Y:</label>
+      <input type="range" min="-50" max="50" value="0">
+    </div>
+    <div class="slider-row">
+      <label>Lățime Gură (Width):</label>
+      <input type="range" min="10" max="100" value="50">
+    </div>
+    <div class="slider-row">
+      <label>Sensibilitate Deschidere:</label>
+      <input type="range" min="1" max="100" value="60">
+    </div>
+  </div>
+
+  <div class="status-bar">v1.5 Square 1:1 Active 🟢</div>
 </div>
 
 <script>
-  // Starea transformării
+  // Stări pentru Pozitionare, Zoom și AI Crop
   let scale = 1.2;
   let posX = 0;
   let posY = 0;
   let isAiCropOn = true;
+  let isCameraOn = true;
 
-  const avatarWrapper = document.getElementById('avatarWrapper');
+  const avatarContainer = document.getElementById('avatarContainer');
+  const avatarImg = document.getElementById('avatarImg');
+  const bgLayer = document.getElementById('bgLayer');
   const viewport = document.getElementById('viewport');
+
   const scaleSlider = document.getElementById('scaleSlider');
   const offsetXSlider = document.getElementById('offsetXSlider');
   const offsetYSlider = document.getElementById('offsetYSlider');
-  const btnAiCrop = document.getElementById('btnAiCrop');
 
-  // Actualizează proprietățile vizuale ale avatarului
+  // Actualizare Transformări Vizuale
   function applyTransform() {
-    avatarWrapper.style.transform = `translate(-50%, -50%) translate(${posX}px, ${posY}px) scale(${scale})`;
+    avatarContainer.style.transform = `translate(-50%, -50%) translate(${posX}px, ${posY}px) scale(${scale})`;
     scaleSlider.value = scale;
     offsetXSlider.value = posX;
     offsetYSlider.value = posY;
@@ -254,32 +327,75 @@
     applyTransform();
   }
 
-  // Comutare AI Crop / Auto Fit
+  // Upload Fundal
+  function loadBackground(e) {
+    const file = e.target.files[0];
+    if (file) {
+      bgLayer.src = URL.createObjectURL(file);
+    }
+  }
+
+  // Upload Avatar PNG
+  function loadAvatar(e) {
+    const file = e.target.files[0];
+    if (file) {
+      avatarImg.src = URL.createObjectURL(file);
+    }
+  }
+
+  // Toggle Camera
+  function toggleCamera() {
+    isCameraOn = !isCameraOn;
+    const btn = document.getElementById('btnCamera');
+    btn.classList.toggle('active', isCameraOn);
+    btn.innerText = `Camera Reală: ${isCameraOn ? 'ON' : 'OFF'}`;
+  }
+
+  // Toggle AI Crop & Fit
   function toggleAiCrop() {
     isAiCropOn = !isAiCropOn;
+    const btn = document.getElementById('btnAiCrop');
+    btn.classList.toggle('active', isAiCropOn);
+    btn.innerText = `AI Cut-Off / Crop: ${isAiCropOn ? 'ON' : 'OFF'}`;
+    
     if (isAiCropOn) {
-      avatarWrapper.classList.add('ai-crop-on');
-      btnAiCrop.classList.add('active');
-      btnAiCrop.innerText = 'AI Crop & Fit: ON';
+      avatarContainer.classList.add('ai-crop-on');
       scale = 1.2;
     } else {
-      avatarWrapper.classList.remove('ai-crop-on');
-      btnAiCrop.classList.remove('active');
-      btnAiCrop.innerText = 'AI Crop & Fit: OFF';
+      avatarContainer.classList.remove('ai-crop-on');
       scale = 1.0;
     }
     applyTransform();
   }
 
-  // Resetare poziție
-  function resetTransform() {
-    scale = isAiCropOn ? 1.2 : 1.0;
+  // Autocalibrare Centru
+  function autoCalibrateCenter() {
     posX = 0;
     posY = 0;
+    scale = 1.25;
     applyTransform();
   }
 
-  // Interacțiune prin Dragging (Mouse și Touch)
+  // Reset Poziție Touch / Mouse
+  function resetTransform() {
+    posX = 0;
+    posY = 0;
+    scale = isAiCropOn ? 1.2 : 1.0;
+    applyTransform();
+  }
+
+  // Comutator Full Screen
+  function toggleFullScreen() {
+    if (!document.fullscreenElement) {
+      document.getElementById('appCard').requestFullscreen().catch(err => {
+        alert("Eroare la pornirea modulului Full Screen.");
+      });
+    } else {
+      document.exitFullscreen();
+    }
+  }
+
+  // Interacțiune directă cu Mouse Drag pe Ecran
   let isDragging = false;
   let startX, startY;
 
@@ -298,7 +414,7 @@
 
   window.addEventListener('mouseup', () => { isDragging = false; });
 
-  // Zoom prin Rotița Mouse-ului
+  // Zoom cu Rotița Mouse-ului
   viewport.addEventListener('wheel', (e) => {
     e.preventDefault();
     const zoomFactor = e.deltaY < 0 ? 0.05 : -0.05;
@@ -306,18 +422,7 @@
     applyTransform();
   }, { passive: false });
 
-  // Ecran Complet (Full Screen)
-  function toggleFullScreen() {
-    if (!document.fullscreenElement) {
-      document.getElementById('mainContainer').requestFullscreen().catch(err => {
-        alert(`Eroare activare Full Screen: ${err.message}`);
-      });
-    } else {
-      document.exitFullscreen();
-    }
-  }
-
-  // Inițializare
+  // Initalizare
   applyTransform();
 </script>
 
