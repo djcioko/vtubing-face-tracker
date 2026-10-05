@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>VTuber Studio v2.0 - Face & Full Body Tracking</title>
+  <title>VTuber Studio v2.0 - Fixed & Working</title>
 
   <!-- MediaPipe CDNs -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
@@ -166,7 +166,7 @@
 
     #status {
       font-size: 11px;
-      color: #22c55e;
+      color: #eab308;
       text-align: center;
       margin-top: 6px;
     }
@@ -174,7 +174,7 @@
 </head>
 <body>
 
-  <h3>🎭 VTuber Studio v2.0 - Face & Body Tracking</h3>
+  <h3>🎭 VTuber Studio v2.0 - Reparat</h3>
 
   <div class="canvas-container" id="canvasContainer">
     <video id="webcam" playsinline style="display:none;"></video>
@@ -184,7 +184,6 @@
 
   <div class="controls-panel">
     
-    <!-- Comenzi Principale -->
     <div class="btn-group">
       <button id="toggleShowCam" class="btn">Camera Reală: OFF</button>
       <button id="toggleAiCut" class="btn">AI Cut-Off: OFF</button>
@@ -195,7 +194,6 @@
       <button id="fullScreenBtn" class="btn btn-full btn-fullscreen">🖥️ Full Screen (Ecran Complet)</button>
     </div>
 
-    <!-- Galerie Fundaluri -->
     <div class="section-title">🖼️ / 🎬 FUNDAL SCENĂ (FOTO / VIDEO)</div>
     <div class="btn-group">
       <label class="btn" style="flex: 100%;">
@@ -205,7 +203,6 @@
     </div>
     <div class="gallery" id="bgGallery"></div>
 
-    <!-- Galerie Avatare / Măști -->
     <div class="section-title">👽 AVATAR / MASCĂ PNG</div>
     <div class="btn-group">
       <label class="btn" style="flex: 100%;">
@@ -215,7 +212,6 @@
     </div>
     <div class="gallery" id="avatarGallery"></div>
 
-    <!-- Corecție Orientare Mască -->
     <div class="section-title">🔄 ORIENTARE & FLIP MASCĂ</div>
     <div class="btn-group">
       <button id="btnFlipH" class="btn">Oglindire (Flip H)</button>
@@ -226,7 +222,6 @@
       <input type="range" id="rotationSlider" min="0" max="360" step="1" value="0">
     </div>
 
-    <!-- Calibrare & Zoom Masiv -->
     <div class="section-title">⚙️ CALIBRARE MASCĂ (ZOOM 0.1x - 20x)</div>
     <div class="row">
       <label>Scale Lățime (Width):</label>
@@ -245,7 +240,6 @@
       <input type="range" id="offsetYSlider" min="-500" max="500" step="1" value="0">
     </div>
 
-    <!-- Calibrare Gură -->
     <div class="section-title">👄 AJUSTARE FINĂ GURĂ</div>
     <div class="row">
       <label>Fine-Tune Gură X:</label>
@@ -264,7 +258,7 @@
       <input type="range" id="mouthSensSlider" min="1" max="30" step="1" value="15">
     </div>
 
-    <div id="status">Se pornește camera web...</div>
+    <div id="status">Se inițializează camera... Permiteți accesul.</div>
   </div>
 
   <script>
@@ -390,7 +384,7 @@
       if (itemData.type === 'video') {
         activeBgImage = null;
         bgVideoElement.src = itemData.src;
-        bgVideoElement.play();
+        bgVideoElement.play().catch(e => console.log(e));
       } else {
         bgVideoElement.pause();
         activeBgImage = new Image();
@@ -445,7 +439,6 @@
       }
     });
 
-    // Zoom rapid prin Scroll
     canvasContainer.addEventListener('wheel', (e) => {
       e.preventDefault();
       let step = e.deltaY < 0 ? 0.2 : -0.2;
@@ -454,7 +447,6 @@
       saveState();
     }, { passive: false });
 
-    // Drag & Drop
     function handlePointerDown(clientX, clientY) {
       isDragging = true;
       startTouchX = clientX;
@@ -513,6 +505,7 @@
       scaleHeightSlider.value = 4.5;
       saveState();
       statusEl.innerText = "Centrat & Scalat cu succes! 🎯";
+      statusEl.style.color = '#22c55e';
     });
 
     function renderGalleries() {
@@ -620,7 +613,6 @@
       saveState();
     });
 
-    // MediaPipe Setup
     const selfieSegmentation = new SelfieSegmentation({
       locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`
     });
@@ -641,16 +633,16 @@
     const pose = new Pose({
       locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
     });
-    pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+    pose.setOptions({ modelComplexity: 0, smoothLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
     pose.onResults((results) => {
       latestPoseResults = results;
     });
 
     function drawScene() {
       statusEl.innerText = "Camera Activă 🟢";
+      statusEl.style.color = '#22c55e';
       canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
 
-      // 1. Redare Fundal
       if (activeBgType === 'video' && bgVideoElement.readyState >= 2) {
         canvasCtx.drawImage(bgVideoElement, 0, 0, canvasElement.width, canvasElement.height);
       } else if (activeBgType === 'image' && activeBgImage && activeBgImage.complete) {
@@ -660,7 +652,6 @@
         canvasCtx.fillRect(0, 0, canvasElement.width, canvasElement.height);
       }
 
-      // 2. Redare Camera Reală (opțional)
       if (showRealCam) {
         canvasCtx.save();
         if (isAiCutOn && latestSegmentationMask) {
@@ -671,4 +662,113 @@
           segmentCtx.globalCompositeOperation = 'source-over';
           canvasCtx.drawImage(segmentCanvas, 0, 0, canvasElement.width, canvasElement.height);
         } else {
-          canvasCtx.drawImage(videoElement, 0, 0, canvasElement.
+          canvasCtx.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
+        }
+        canvasCtx.restore();
+      }
+
+      if (isBodyTrackOn && latestPoseResults && latestPoseResults.poseLandmarks) {
+        const lm = latestPoseResults.poseLandmarks;
+        canvasCtx.save();
+        [lm[11], lm[12], lm[15], lm[16]].forEach((pt, i) => {
+          if (pt && pt.visibility > 0.5) {
+            canvasCtx.beginPath();
+            canvasCtx.arc(pt.x * canvasElement.width, pt.y * canvasElement.height, i < 2 ? 8 : 12, 0, Math.PI * 2);
+            canvasCtx.fillStyle = i < 2 ? '#0284c7' : '#ef4444';
+            canvasCtx.fill();
+          }
+        });
+        canvasCtx.restore();
+      }
+
+      if (latestFaceResults && latestFaceResults.multiFaceLandmarks && latestFaceResults.multiFaceLandmarks.length > 0) {
+        const landmarks = latestFaceResults.multiFaceLandmarks[0];
+
+        const lipTop = landmarks[13];
+        const lipBottom = landmarks[14];
+        const jawDist = Math.hypot(lipTop.x - lipBottom.x, lipTop.y - lipBottom.y);
+        const sens = parseFloat(mouthSensSlider.value);
+        const jawOpenValue = Math.min(Math.max((jawDist - 0.015) * sens, 0), 1);
+
+        const leftEye = landmarks[33];
+        const rightEye = landmarks[263];
+        const nose = landmarks[1];
+
+        const dx = (rightEye.x - leftEye.x) * canvasElement.width;
+        const dy = (rightEye.y - leftEye.y) * canvasElement.height;
+        const targetAngle = Math.atan2(dy, dx);
+        const targetEyeDist = Math.hypot(dx, dy);
+
+        const offX = parseFloat(offsetXSlider.value) + dragOffsetX;
+        const offY = parseFloat(offsetYSlider.value) + dragOffsetY;
+        const targetX = nose.x * canvasElement.width + offX;
+        const targetY = nose.y * canvasElement.height + offY;
+
+        smoothX = lerp(smoothX || targetX, targetX, 0.85);
+        smoothY = lerp(smoothY || targetY, targetY, 0.85);
+        smoothAngle = lerp(smoothAngle || targetAngle, targetAngle, 0.85);
+        smoothEyeDist = lerp(smoothEyeDist || targetEyeDist, targetEyeDist, 0.85);
+
+        const scaleW = parseFloat(scaleWidthSlider.value);
+        const scaleH = parseFloat(scaleHeightSlider.value);
+        const manualRot = (parseFloat(rotationSlider.value) * Math.PI) / 180;
+
+        const maskWidth = smoothEyeDist * scaleW;
+        const maskHeight = smoothEyeDist * scaleH;
+
+        if (activeAvatar && activeAvatar.complete) {
+          canvasCtx.save();
+          canvasCtx.translate(smoothX, smoothY);
+          canvasCtx.rotate(smoothAngle + manualRot);
+          canvasCtx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
+
+          canvasCtx.drawImage(activeAvatar, -maskWidth / 2, -maskHeight / 2, maskWidth, maskHeight);
+
+          const lipCenterY = (lipTop.y + lipBottom.y) / 2;
+          const autoMouthY = (lipCenterY - nose.y) * canvasElement.height;
+
+          const fineX = parseFloat(mouthXSlider.value);
+          const fineY = parseFloat(mouthYSlider.value);
+          const finalMouthX = fineX;
+          const finalMouthY = autoMouthY + fineY;
+
+          const mWidth = parseFloat(mouthWidthSlider.value);
+          const mouthOpenH = Math.max(2, jawOpenValue * 25);
+
+          canvasCtx.beginPath();
+          canvasCtx.ellipse(finalMouthX, finalMouthY, mWidth / 2, mouthOpenH / 2, 0, 0, Math.PI * 2);
+          canvasCtx.fillStyle = '#050811';
+          canvasCtx.fill();
+
+          canvasCtx.restore();
+        }
+      }
+    }
+
+    const camera = new Camera(videoElement, {
+      onFrame: async () => {
+        try {
+          if (isAiCutOn && showRealCam) {
+            await selfieSegmentation.send({image: videoElement});
+          }
+          if (isBodyTrackOn) {
+            await pose.send({image: videoElement});
+          }
+          await faceMesh.send({image: videoElement});
+        } catch(e) {
+          console.error(e);
+        }
+      },
+      width: 500,
+      height: 500
+    });
+
+    loadState();
+    renderGalleries();
+    camera.start().catch(err => {
+      statusEl.innerText = "Eroare la accesarea camerei! Asigură-te că ai permis accesul.";
+      statusEl.style.color = '#ef4444';
+    });
+  </script>
+</body>
+</html>
