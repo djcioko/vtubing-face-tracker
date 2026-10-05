@@ -787,3 +787,18 @@
               console.error(err);
             }
           }
+          requestAnimationFrame(processFrame);
+        };
+        processFrame();
+      } catch(err) {
+        statusEl.innerText = "Eroare la pornirea camerei! Verificați permisiunile.";
+        statusEl.style.color = '#ef4444';
+      }
+    }
+
+    loadState();
+    renderGalleries();
+    initCamera();
+  </script>
+</body>
+</html>
