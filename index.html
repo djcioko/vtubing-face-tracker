@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>VTuber Studio v2.1 - Galerie & Memorie Media</title>
+  <title>VTuber Studio v2.2 - Camera & Memorie OK</title>
 
   <!-- MediaPipe CDNs -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
@@ -52,7 +52,7 @@
       object-fit: cover;
     }
 
-    #bgVideoElement { display: none; }
+    #webcam, #bgVideoElement { display: none; }
 
     .controls-panel {
       width: 100%;
@@ -182,10 +182,10 @@
 </head>
 <body>
 
-  <h3>🎭 VTuber Studio v2.1</h3>
+  <h3>🎭 VTuber Studio v2.2</h3>
 
   <div class="canvas-container" id="canvasContainer">
-    <video id="webcam" playsinline style="display:none;"></video>
+    <video id="webcam" playsinline muted></video>
     <video id="bgVideoElement" loop playsinline muted></video>
     <canvas id="output_canvas"></canvas>
   </div>
@@ -268,7 +268,7 @@
       <input type="range" id="mouthSensSlider" min="1" max="30" step="1" value="15">
     </div>
 
-    <div id="status">Se inițializează camera... Permiteți accesul.</div>
+    <div id="status">Se pornește camera web...</div>
   </div>
 
   <script>
@@ -388,3 +388,402 @@
         selectAvatar(savedAvatars[saved.activeAvatarIndex]);
       }
     }
+
+    function selectBg(itemData) {
+      activeBgType = itemData.type;
+      if (itemData.type === 'video') {
+        activeBgImage = null;
+        bgVideoElement.src = itemData.src;
+        bgVideoElement.play().catch(e => console.log(e));
+      } else {
+        bgVideoElement.pause();
+        activeBgImage = new Image();
+        activeBgImage.src = itemData.src;
+      }
+      renderGalleries();
+      saveState();
+    }
+
+    function selectAvatar(src) {
+      activeAvatar = new Image();
+      activeAvatar.src = src;
+      renderGalleries();
+      saveState();
+    }
+
+    btnFlipH.addEventListener('click', () => {
+      flipH = !flipH;
+      btnFlipH.classList.toggle('active', flipH);
+      saveState();
+    });
+
+    btnFlipV.addEventListener('click', () => {
+      flipV = !flipV;
+      btnFlipV.classList.toggle('active', flipV);
+      saveState();
+    });
+
+    toggleBodyTrackBtn.addEventListener('click', () => {
+      isBodyTrackOn = !isBodyTrackOn;
+      toggleBodyTrackBtn.innerText = `Urmărire Corp: ${isBodyTrackOn ? 'ON' : 'OFF'}`;
+      toggleBodyTrackBtn.classList.toggle('active', isBodyTrackOn);
+      saveState();
+    });
+
+    btnCrop.addEventListener('click', () => {
+      isAiCropOn = !isAiCropOn;
+      btnCrop.innerText = `AI Crop ${isAiCropOn ? 'ON' : 'OFF'}`;
+      btnCrop.classList.toggle('active', isAiCropOn);
+      if (isAiCropOn) {
+        scaleWidthSlider.value = 4.5;
+        scaleHeightSlider.value = 5.0;
+      }
+      saveState();
+    });
+
+    fullScreenBtn.addEventListener('click', () => {
+      if (!document.fullscreenElement) {
+        canvasContainer.requestFullscreen().catch(err => alert("Eroare Full Screen: " + err.message));
+      } else {
+        document.exitFullscreen();
+      }
+    });
+
+    canvasContainer.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      let step = e.deltaY < 0 ? 0.2 : -0.2;
+      scaleWidthSlider.value = Math.min(Math.max(0.1, parseFloat(scaleWidthSlider.value) + step), 20).toFixed(1);
+      scaleHeightSlider.value = Math.min(Math.max(0.1, parseFloat(scaleHeightSlider.value) + step), 20).toFixed(1);
+      saveState();
+    }, { passive: false });
+
+    function handlePointerDown(clientX, clientY) {
+      isDragging = true;
+      startTouchX = clientX;
+      startTouchY = clientY;
+    }
+
+    function handlePointerMove(clientX, clientY) {
+      if (!isDragging) return;
+      const rect = canvasContainer.getBoundingClientRect();
+      const deltaX = (clientX - startTouchX) * (canvasElement.width / rect.width);
+      const deltaY = (clientY - startTouchY) * (canvasElement.height / rect.height);
+
+      dragOffsetX += deltaX;
+      dragOffsetY += deltaY;
+
+      startTouchX = clientX;
+      startTouchY = clientY;
+      saveState();
+    }
+
+    function handlePointerUp() { isDragging = false; }
+
+    canvasContainer.addEventListener('mousedown', (e) => handlePointerDown(e.clientX, e.clientY));
+    window.addEventListener('mousemove', (e) => handlePointerMove(e.clientX, e.clientY));
+    window.addEventListener('mouseup', handlePointerUp);
+
+    canvasContainer.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 1) handlePointerDown(e.touches[0].clientX, e.touches[0].clientY);
+    }, { passive: true });
+
+    window.addEventListener('touchmove', (e) => {
+      if (e.touches.length === 1) handlePointerMove(e.touches[0].clientX, e.touches[0].clientY);
+    }, { passive: true });
+
+    window.addEventListener('touchend', handlePointerUp);
+
+    resetTouchBtn.addEventListener('click', () => {
+      dragOffsetX = 0;
+      dragOffsetY = 0;
+      offsetXSlider.value = 0;
+      offsetYSlider.value = 0;
+      rotationSlider.value = 0;
+      flipH = false;
+      flipV = false;
+      btnFlipH.classList.remove('active');
+      btnFlipV.classList.remove('active');
+      saveState();
+    });
+
+    autoCalibrateBtn.addEventListener('click', () => {
+      dragOffsetX = 0;
+      dragOffsetY = 0;
+      offsetXSlider.value = 0;
+      offsetYSlider.value = 0;
+      scaleWidthSlider.value = 4.0;
+      scaleHeightSlider.value = 4.5;
+      saveState();
+      statusEl.innerText = "Centrat & Scalat cu succes! 🎯";
+      statusEl.style.color = '#22c55e';
+    });
+
+    function renderGalleries() {
+      try {
+        localStorage.setItem('vtuber_bgs_v21', JSON.stringify(savedBgs));
+        localStorage.setItem('vtuber_avatars_v21', JSON.stringify(savedAvatars));
+      } catch(e) {
+        console.warn("Memorie stocare plină.");
+      }
+
+      bgGallery.innerHTML = '';
+      savedBgs.forEach((itemData, idx) => {
+        const item = document.createElement('div');
+        const isActive = (activeBgType === itemData.type && (
+          (itemData.type === 'image' && activeBgImage && activeBgImage.src === itemData.src) ||
+          (itemData.type === 'video' && bgVideoElement.src === itemData.src)
+        ));
+
+        item.className = 'gallery-item' + (isActive ? ' active' : '');
+        let mediaEl = itemData.type === 'video' ? document.createElement('video') : document.createElement('img');
+        mediaEl.src = itemData.src;
+
+        item.onclick = () => selectBg(itemData);
+
+        const delBtn = document.createElement('button');
+        delBtn.className = 'delete-btn';
+        delBtn.innerText = '✕';
+        delBtn.onclick = (e) => {
+          e.stopPropagation();
+          savedBgs.splice(idx, 1);
+          if (isActive) {
+            activeBgType = null;
+            activeBgImage = null;
+            bgVideoElement.src = '';
+          }
+          renderGalleries();
+          saveState();
+        };
+
+        item.appendChild(mediaEl);
+        item.appendChild(delBtn);
+        bgGallery.appendChild(item);
+      });
+
+      avatarGallery.innerHTML = '';
+      savedAvatars.forEach((src, idx) => {
+        const item = document.createElement('div');
+        const isActive = (activeAvatar && activeAvatar.src === src);
+        item.className = 'gallery-item' + (isActive ? ' active' : '');
+        const img = document.createElement('img');
+        img.src = src;
+
+        item.onclick = () => selectAvatar(src);
+
+        const delBtn = document.createElement('button');
+        delBtn.className = 'delete-btn';
+        delBtn.innerText = '✕';
+        delBtn.onclick = (e) => {
+          e.stopPropagation();
+          if (isActive) activeAvatar = null;
+          savedAvatars.splice(idx, 1);
+          renderGalleries();
+          saveState();
+        };
+
+        item.appendChild(img);
+        item.appendChild(delBtn);
+        avatarGallery.appendChild(item);
+      });
+    }
+
+    document.getElementById('bgLoader').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        if (savedBgs.length >= 10) {
+          alert("Ai atins limita de 10 fundaluri! Șterge unul înainte de a adăuga altul.");
+          return;
+        }
+        const isVideo = file.type.startsWith('video/');
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          const bgData = { type: isVideo ? 'video' : 'image', src: evt.target.result };
+          savedBgs.push(bgData);
+          selectBg(bgData);
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    document.getElementById('avatarLoader').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        if (savedAvatars.length >= 10) {
+          alert("Ai atins limita de 10 măști! Șterge una înainte de a adăuga alta.");
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          savedAvatars.push(evt.target.result);
+          selectAvatar(evt.target.result);
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    toggleShowCamBtn.addEventListener('click', () => {
+      showRealCam = !showRealCam;
+      toggleShowCamBtn.innerText = `Camera Reală: ${showRealCam ? 'ON' : 'OFF'}`;
+      toggleShowCamBtn.classList.toggle('active', showRealCam);
+      saveState();
+    });
+
+    toggleAiCutBtn.addEventListener('click', () => {
+      isAiCutOn = !isAiCutOn;
+      toggleAiCutBtn.innerText = `AI Cut-Off: ${isAiCutOn ? 'ON' : 'OFF'}`;
+      toggleAiCutBtn.classList.toggle('active', isAiCutOn);
+      saveState();
+    });
+
+    const selfieSegmentation = new SelfieSegmentation({
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`
+    });
+    selfieSegmentation.setOptions({ modelSelection: 1 });
+    selfieSegmentation.onResults((results) => {
+      latestSegmentationMask = results.segmentationMask;
+    });
+
+    const faceMesh = new FaceMesh({
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
+    });
+    faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+    faceMesh.onResults((results) => {
+      latestFaceResults = results;
+      drawScene();
+    });
+
+    const pose = new Pose({
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
+    });
+    pose.setOptions({ modelComplexity: 0, smoothLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+    pose.onResults((results) => {
+      latestPoseResults = results;
+    });
+
+    function drawScene() {
+      statusEl.innerText = "Camera Activă 🟢";
+      statusEl.style.color = '#22c55e';
+      canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+
+      if (activeBgType === 'video' && bgVideoElement.readyState >= 2) {
+        canvasCtx.drawImage(bgVideoElement, 0, 0, canvasElement.width, canvasElement.height);
+      } else if (activeBgType === 'image' && activeBgImage && activeBgImage.complete) {
+        canvasCtx.drawImage(activeBgImage, 0, 0, canvasElement.width, canvasElement.height);
+      } else {
+        canvasCtx.fillStyle = '#050811';
+        canvasCtx.fillRect(0, 0, canvasElement.width, canvasElement.height);
+      }
+
+      if (showRealCam && videoElement.readyState >= 2) {
+        canvasCtx.save();
+        if (isAiCutOn && latestSegmentationMask) {
+          segmentCtx.clearRect(0, 0, segmentCanvas.width, segmentCanvas.height);
+          segmentCtx.drawImage(latestSegmentationMask, 0, 0, segmentCanvas.width, segmentCanvas.height);
+          segmentCtx.globalCompositeOperation = 'source-in';
+          segmentCtx.drawImage(videoElement, 0, 0, segmentCanvas.width, segmentCanvas.height);
+          segmentCtx.globalCompositeOperation = 'source-over';
+          canvasCtx.drawImage(segmentCanvas, 0, 0, canvasElement.width, canvasElement.height);
+        } else {
+          canvasCtx.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
+        }
+        canvasCtx.restore();
+      }
+
+      if (isBodyTrackOn && latestPoseResults && latestPoseResults.poseLandmarks) {
+        const lm = latestPoseResults.poseLandmarks;
+        canvasCtx.save();
+        [lm[11], lm[12], lm[15], lm[16]].forEach((pt, i) => {
+          if (pt && pt.visibility > 0.5) {
+            canvasCtx.beginPath();
+            canvasCtx.arc(pt.x * canvasElement.width, pt.y * canvasElement.height, i < 2 ? 8 : 12, 0, Math.PI * 2);
+            canvasCtx.fillStyle = i < 2 ? '#0284c7' : '#ef4444';
+            canvasCtx.fill();
+          }
+        });
+        canvasCtx.restore();
+      }
+
+      if (latestFaceResults && latestFaceResults.multiFaceLandmarks && latestFaceResults.multiFaceLandmarks.length > 0) {
+        const landmarks = latestFaceResults.multiFaceLandmarks[0];
+
+        const lipTop = landmarks[13];
+        const lipBottom = landmarks[14];
+        const jawDist = Math.hypot(lipTop.x - lipBottom.x, lipTop.y - lipBottom.y);
+        const sens = parseFloat(mouthSensSlider.value);
+        const jawOpenValue = Math.min(Math.max((jawDist - 0.015) * sens, 0), 1);
+
+        const leftEye = landmarks[33];
+        const rightEye = landmarks[263];
+        const nose = landmarks[1];
+
+        const dx = (rightEye.x - leftEye.x) * canvasElement.width;
+        const dy = (rightEye.y - leftEye.y) * canvasElement.height;
+        const targetAngle = Math.atan2(dy, dx);
+        const targetEyeDist = Math.hypot(dx, dy);
+
+        const offX = parseFloat(offsetXSlider.value) + dragOffsetX;
+        const offY = parseFloat(offsetYSlider.value) + dragOffsetY;
+        const targetX = nose.x * canvasElement.width + offX;
+        const targetY = nose.y * canvasElement.height + offY;
+
+        smoothX = lerp(smoothX || targetX, targetX, 0.85);
+        smoothY = lerp(smoothY || targetY, targetY, 0.85);
+        smoothAngle = lerp(smoothAngle || targetAngle, targetAngle, 0.85);
+        smoothEyeDist = lerp(smoothEyeDist || targetEyeDist, targetEyeDist, 0.85);
+
+        const scaleW = parseFloat(scaleWidthSlider.value);
+        const scaleH = parseFloat(scaleHeightSlider.value);
+        const manualRot = (parseFloat(rotationSlider.value) * Math.PI) / 180;
+
+        const maskWidth = smoothEyeDist * scaleW;
+        const maskHeight = smoothEyeDist * scaleH;
+
+        if (activeAvatar && activeAvatar.complete) {
+          canvasCtx.save();
+          canvasCtx.translate(smoothX, smoothY);
+          canvasCtx.rotate(smoothAngle + manualRot);
+          canvasCtx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
+
+          canvasCtx.drawImage(activeAvatar, -maskWidth / 2, -maskHeight / 2, maskWidth, maskHeight);
+
+          const lipCenterY = (lipTop.y + lipBottom.y) / 2;
+          const autoMouthY = (lipCenterY - nose.y) * canvasElement.height;
+
+          const fineX = parseFloat(mouthXSlider.value);
+          const fineY = parseFloat(mouthYSlider.value);
+          const finalMouthX = fineX;
+          const finalMouthY = autoMouthY + fineY;
+
+          const mWidth = parseFloat(mouthWidthSlider.value);
+          const mouthOpenH = Math.max(2, jawOpenValue * 25);
+
+          canvasCtx.beginPath();
+          canvasCtx.ellipse(finalMouthX, finalMouthY, mWidth / 2, mouthOpenH / 2, 0, 0, Math.PI * 2);
+          canvasCtx.fillStyle = '#050811';
+          canvasCtx.fill();
+
+          canvasCtx.restore();
+        }
+      }
+    }
+
+    async function initCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 500, height: 500 } });
+        videoElement.srcObject = stream;
+        await videoElement.play();
+
+        const processFrame = async () => {
+          if (videoElement.readyState >= 2) {
+            try {
+              if (isAiCutOn && showRealCam) {
+                await selfieSegmentation.send({ image: videoElement });
+              }
+              if (isBodyTrackOn) {
+                await pose.send({ image: videoElement });
+              }
+              await faceMesh.send({ image: videoElement });
+            } catch(err) {
+              console.error(err);
+            }
+          }
