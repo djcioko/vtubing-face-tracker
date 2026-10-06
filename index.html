@@ -3,614 +3,805 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>VTuber Studio - AI Crop Corp & Free-Form Controls</title>
-  
-  <!-- MediaPipe Libraries (FaceMesh + Pose + Selfie Segmentation) -->
+  <title>VTuber Studio v2.3 - Corp Integrat & Mască</title>
+
+  <!-- MediaPipe CDNs -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
 
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
-    body, html {
-      width: 100%; height: 100%; background: #06090e;
-      font-family: 'Segoe UI', Roboto, sans-serif; color: #fff;
-      display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
-      overflow-y: auto; overflow-x: hidden;
+    * { box-sizing: border-box; touch-action: manipulation; }
+    body {
+      margin: 0;
+      padding: 10px;
+      background: #090d16;
+      color: #38bdf8;
+      font-family: system-ui, -apple-system, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     }
 
-    #preview-container {
+    h3 { margin: 4px 0 10px 0; color: #38bdf8; text-align: center; font-size: 16px; }
+
+    .canvas-container {
       position: relative;
       width: 100%;
-      max-width: 520px;
-      height: 65vh;
-      margin-top: 10px;
-      background: #000;
-      border: 2px solid #00a2ff;
-      border-radius: 10px;
+      max-width: 400px;
+      aspect-ratio: 1/1;
+      border-radius: 12px;
       overflow: hidden;
-      box-shadow: 0 0 15px rgba(0, 162, 255, 0.25);
+      border: 2px solid #0284c7;
+      background: #000;
+      box-shadow: 0 0 20px rgba(2, 132, 199, 0.2);
+      touch-action: none;
       cursor: grab;
     }
-    #preview-container:active { cursor: grabbing; }
 
-    :fullscreen #preview-container, :-webkit-full-screen #preview-container {
-      max-width: 100vw; width: 100vw; height: 100vh;
-      margin: 0; border: none; border-radius: 0;
-    }
+    .canvas-container:active { cursor: grabbing; }
 
-    canvas {
-      width: 100%; height: 100%;
+    video, canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
       object-fit: cover;
-      display: block;
-    }
-    video { display: none; }
-
-    #overlay-controls {
-      position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
-      z-index: 50; display: flex; align-items: center; gap: 10px;
-      background: rgba(0,0,0,0.8); padding: 6px 14px; border-radius: 20px;
-      border: 1px solid rgba(0,162,255,0.4);
     }
 
-    #main-panel {
-      width: 100%; max-width: 520px; padding: 15px;
-      display: flex; flex-direction: column; gap: 10px;
-      margin-bottom: 50px;
-    }
+    #webcam, #bgVideoElement { display: none; }
 
-    .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-
-    .btn-action {
-      background: #0078d4; color: white; border: 1px solid #005a9e;
-      padding: 10px; border-radius: 6px; font-weight: bold; cursor: pointer;
-      text-align: center; font-size: 13px; transition: 0.2s;
+    .controls-panel {
+      width: 100%;
+      max-width: 400px;
+      margin-top: 10px;
+      background: #111827;
+      padding: 12px;
+      border-radius: 10px;
+      border: 1px solid #1f2937;
+      font-size: 12px;
     }
-    .btn-action.active { background: #00a2ff; border-color: #66c2ff; box-shadow: 0 0 8px rgba(0,162,255,0.6); }
-    .btn-green { background: #00b894; border-color: #00cec9; color: #fff; }
-    .btn-green:hover { background: #00bec9; }
 
     .section-title {
-      font-size: 11px; font-weight: bold; color: #00a2ff;
-      text-transform: uppercase; margin-top: 10px; letter-spacing: 0.5px;
-      border-bottom: 1px solid rgba(0, 162, 255, 0.2); padding-bottom: 3px;
+      font-weight: bold;
+      color: #94a3b8;
+      margin: 10px 0 6px 0;
+      border-bottom: 1px solid #1e293b;
+      padding-bottom: 2px;
     }
 
-    .slider-group { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
-    .slider-row { display: flex; justify-content: space-between; font-size: 11px; color: #ccc; }
-    input[type="range"] { width: 100%; accent-color: #00a2ff; cursor: pointer; }
+    .btn-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
 
-    .gallery-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-top: 6px; }
+    .btn {
+      flex: 1 1 calc(50% - 6px);
+      padding: 8px;
+      background: #1e293b;
+      border: 1px solid #0284c7;
+      color: #38bdf8;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: bold;
+      text-align: center;
+      font-size: 11px;
+      transition: all 0.2s;
+    }
+
+    .btn.active {
+      background: #0284c7;
+      color: #fff;
+    }
+
+    .btn-full { flex: 1 1 100%; }
+
+    .btn-fullscreen {
+      background: #10b981;
+      border-color: #059669;
+      color: #fff;
+    }
+
+    input[type="file"] { display: none; }
+
+    .gallery {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 4px 0 8px 0;
+      margin-bottom: 6px;
+      min-height: 62px;
+    }
+
     .gallery-item {
-      position: relative; width: 100%; aspect-ratio: 1; border-radius: 4px; overflow: hidden;
-      border: 2px solid #333; cursor: pointer; background: #111;
+      position: relative;
+      width: 52px;
+      height: 52px;
+      border-radius: 6px;
+      border: 2px solid #334155;
+      overflow: hidden;
+      flex-shrink: 0;
+      cursor: pointer;
+      background: #000;
     }
-    .gallery-item.active { border-color: #00a2ff; box-shadow: 0 0 6px #00a2ff; }
-    .gallery-item img, .gallery-item video { width: 100%; height: 100%; object-fit: cover; }
+
+    .gallery-item.active { 
+      border-color: #38bdf8; 
+      box-shadow: 0 0 8px #38bdf8;
+    }
     
-    .btn-delete {
-      position: absolute; top: 2px; right: 2px; background: #e74c3c;
-      color: white; border: none; font-size: 9px; width: 15px; height: 15px;
-      border-radius: 50%; display: flex; align-items: center; justify-content: center;
-      cursor: pointer; font-weight: bold; z-index: 5;
+    .gallery-item img, .gallery-item video { 
+      width: 100%; 
+      height: 100%; 
+      object-fit: cover; 
     }
 
-    .upload-btn {
-      background: #151d28; border: 1px dashed #00a2ff; color: #00a2ff;
-      padding: 8px; border-radius: 6px; text-align: center; cursor: pointer;
-      font-weight: bold; font-size: 12px; display: block; margin-top: 4px;
+    .delete-btn {
+      position: absolute;
+      top: 1px;
+      right: 1px;
+      background: #ef4444;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 18px;
+      height: 18px;
+      font-size: 10px;
+      font-weight: bold;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 5;
+      box-shadow: 0 0 4px rgba(0,0,0,0.5);
     }
 
-    .btn-record {
-      background: #e74c3c; color: white; border: none; padding: 6px 14px; border-radius: 16px;
-      font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 11px;
+    .row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
     }
-    .btn-record.recording { background: #27ae60; animation: pulse 1.5s infinite; }
 
-    @keyframes pulse {
-      0% { box-shadow: 0 0 0 0 rgba(39, 174, 96, 0.7); }
-      70% { box-shadow: 0 0 0 8px rgba(39, 174, 96, 0); }
-      100% { box-shadow: 0 0 0 0 rgba(39, 174, 96, 0); }
+    label { color: #94a3b8; }
+    input[type="range"] { width: 55%; accent-color: #38bdf8; }
+
+    #status {
+      font-size: 11px;
+      color: #eab308;
+      text-align: center;
+      margin-top: 6px;
     }
   </style>
 </head>
 <body>
 
-  <div id="preview-container">
-    <video id="webcam" playsinline></video>
+  <h3>🎭 VTuber Studio v2.3</h3>
+
+  <div class="canvas-container" id="canvasContainer">
+    <video id="webcam" playsinline muted></video>
+    <video id="bgVideoElement" loop playsinline muted></video>
     <canvas id="output_canvas"></canvas>
-
-    <div id="overlay-controls">
-      <button id="recordBtn" class="btn-record" onclick="toggleRecording()">
-        <span style="height: 7px; width: 7px; background: white; border-radius: 50%;"></span>
-        <span id="recordText">Record MP4</span>
-      </button>
-      <button class="btn-action" style="padding: 4px 10px; font-size: 11px;" onclick="toggleFullscreen()">📺 Fullscreen</button>
-    </div>
   </div>
 
-  <div id="main-panel">
-
-    <div class="btn-grid">
-      <button id="btnCamera" class="btn-action active" onclick="toggleCameraReal()">Camera Reală: ON</button>
-      <button id="btnCrop" class="btn-action active" onclick="toggleCropAI()">AI Cut-Off Corp: ON</button>
-    </div>
-
-    <div class="btn-grid">
-      <button id="btnPose" class="btn-action" onclick="togglePoseLines()">Urmărire Corp: OFF</button>
-      <button id="btnResetTouch" class="btn-action" onclick="resetMaskTouch()">Reset Poziție Touch</button>
-    </div>
-
-    <div class="btn-grid">
-      <button id="btnFlipH" class="btn-action" onclick="toggleFlipH()">Oglindire (Flip H)</button>
-      <button id="btnFlipV" class="btn-action" onclick="toggleFlipV()">Răsturnare (Flip V)</button>
-    </div>
-
-    <button class="btn-action btn-green" onclick="toggleFullscreen()">📺 Full Screen (Ecran Complet)</button>
-
-    <div class="section-title">🖼️ / 🎥 Fundal Scenă (Max 10)</div>
-    <label class="upload-btn">
-      + Upload Fundal Nou (Foto / Video)
-      <input type="file" id="bgUpload" accept="image/*, video/*" multiple style="display:none;">
-    </label>
-    <div id="bgGallery" class="gallery-grid"></div>
-
-    <div class="section-title">🎭 Avatar / Mască PNG (Max 10)</div>
-    <label class="upload-btn">
-      + Upload Mască Nouă (PNG)
-      <input type="file" id="maskUpload" accept="image/png" multiple style="display:none;">
-    </label>
-    <div id="maskGallery" class="gallery-grid"></div>
-
-    <div class="section-title">⚙ Calibrare Mască (Zoom / Scale)</div>
+  <div class="controls-panel">
     
-    <div class="slider-group">
-      <div class="slider-row"><span>Scale Lățime (Width):</span><span id="scaleWVal">1.00x</span></div>
-      <input type="range" id="maskScaleW" min="0.1" max="4.0" step="0.02" value="1.0">
+    <div class="btn-group">
+      <button id="toggleShowCam" class="btn">Camera Reală: OFF</button>
+      <button id="toggleAiCut" class="btn">AI Cut-Off: OFF</button>
+      <button id="toggleBodyTrack" class="btn">Urmărire Corp: OFF</button>
+      <button id="btnCrop" class="btn">AI Crop OFF</button>
+      <button id="autoCalibrateBtn" class="btn">🎯 Autocalibrare Centru</button>
+      <button id="resetTouchBtn" class="btn">Reset Pozitie Touch</button>
+      <button id="fullScreenBtn" class="btn btn-full btn-fullscreen">🖥️ Full Screen (Ecran Complet)</button>
     </div>
 
-    <div class="slider-group">
-      <div class="slider-row"><span>Scale Înălțime (Height):</span><span id="scaleHVal">1.00x</span></div>
-      <input type="range" id="maskScaleH" min="0.1" max="4.0" step="0.02" value="1.0">
+    <!-- Galerie Fundaluri -->
+    <div class="section-title">🖼️ / 🎬 FUNDAL SCENĂ (MAX 10)</div>
+    <div class="btn-group">
+      <label class="btn" style="flex: 100%;">
+        ➕ Upload Fundal Nou (Foto / Video)
+        <input type="file" id="bgLoader" accept="image/*, video/*" multiple>
+      </label>
+    </div>
+    <div class="gallery" id="bgGallery"></div>
+
+    <!-- Galerie Avatare / Măști -->
+    <div class="section-title">👽 AVATAR / MASCĂ PNG (MAX 10)</div>
+    <div class="btn-group">
+      <label class="btn" style="flex: 100%;">
+        ➕ Upload Mască Nouă (PNG)
+        <input type="file" id="avatarLoader" accept="image/*" multiple>
+      </label>
+    </div>
+    <div class="gallery" id="avatarGallery"></div>
+
+    <div class="section-title">🔄 ORIENTARE & FLIP MASCĂ</div>
+    <div class="btn-group">
+      <button id="btnFlipH" class="btn">Oglindire (Flip H)</button>
+      <button id="btnFlipV" class="btn">Răsturnare (Flip V)</button>
+    </div>
+    <div class="row">
+      <label>Rotire Manuală (°):</label>
+      <input type="range" id="rotationSlider" min="0" max="360" step="1" value="0">
     </div>
 
-    <div class="slider-group">
-      <div class="slider-row"><span>Offset Mască X:</span></div>
-      <input type="range" id="maskOffsetX" min="-300" max="300" step="1" value="0">
+    <div class="section-title">⚙️ CALIBRARE MASCĂ (ZOOM 0.1x - 20x)</div>
+    <div class="row">
+      <label>Scale Lățime (Width):</label>
+      <input type="range" id="scaleWidthSlider" min="0.1" max="20" step="0.1" value="2.8">
+    </div>
+    <div class="row">
+      <label>Scale Înălțime (Height):</label>
+      <input type="range" id="scaleHeightSlider" min="0.1" max="20" step="0.1" value="2.8">
+    </div>
+    <div class="row">
+      <label>Offset Mască X:</label>
+      <input type="range" id="offsetXSlider" min="-500" max="500" step="1" value="0">
+    </div>
+    <div class="row">
+      <label>Offset Mască Y:</label>
+      <input type="range" id="offsetYSlider" min="-500" max="500" step="1" value="0">
     </div>
 
-    <div class="slider-group">
-      <div class="slider-row"><span>Offset Mască Y:</span></div>
-      <input type="range" id="maskOffsetY" min="-300" max="300" step="1" value="0">
+    <div class="section-title">👄 AJUSTARE FINĂ GURĂ</div>
+    <div class="row">
+      <label>Fine-Tune Gură X:</label>
+      <input type="range" id="mouthXSlider" min="-100" max="100" step="1" value="0">
+    </div>
+    <div class="row">
+      <label>Fine-Tune Gură Y:</label>
+      <input type="range" id="mouthYSlider" min="-100" max="100" step="1" value="0">
+    </div>
+    <div class="row">
+      <label>Lățime Gură (Width):</label>
+      <input type="range" id="mouthWidthSlider" min="10" max="120" step="1" value="40">
+    </div>
+    <div class="row">
+      <label>Sensibilitate Deschidere Gură:</label>
+      <input type="range" id="mouthSensSlider" min="1" max="30" step="1" value="15">
     </div>
 
-    <div class="slider-group">
-      <div class="slider-row"><span>Rotire Manuală (°):</span></div>
-      <input type="range" id="maskRotate" min="-180" max="180" step="1" value="0">
-    </div>
-
-    <div class="section-title">👄 Ajustare Fină Gură / Lip-Sync</div>
-
-    <div class="slider-group">
-      <div class="slider-row"><span>Fine-Tune Gură X:</span></div>
-      <input type="range" id="mouthOffsetX" min="-50" max="50" step="1" value="0">
-    </div>
-
-    <div class="slider-group">
-      <div class="slider-row"><span>Fine-Tune Gură Y:</span></div>
-      <input type="range" id="mouthOffsetY" min="-50" max="50" step="1" value="0">
-    </div>
-
-    <div class="slider-group">
-      <div class="slider-row"><span>Lățime Gură (Width):</span><span id="mouthWidthVal">1.0x</span></div>
-      <input type="range" id="mouthWidthScale" min="0.5" max="2.5" step="0.05" value="1.0">
-    </div>
-
-    <div class="slider-group">
-      <div class="slider-row"><span>Sensibilitate Deschidere Gură:</span><span id="mouthSensVal">1.0x</span></div>
-      <input type="range" id="mouthSens" min="0.2" max="3.0" step="0.1" value="1.0">
-    </div>
-
+    <div id="status">Se pornește camera web...</div>
   </div>
 
-<script>
-  const videoElement = document.getElementById('webcam');
-  const canvasElement = document.getElementById('output_canvas');
-  const canvasCtx = canvasElement.getContext('2d');
-  const previewContainer = document.getElementById('preview-container');
+  <script>
+    const videoElement = document.getElementById('webcam');
+    const bgVideoElement = document.getElementById('bgVideoElement');
+    const canvasElement = document.getElementById('output_canvas');
+    const canvasContainer = document.getElementById('canvasContainer');
+    const canvasCtx = canvasElement.getContext('2d');
+    const statusEl = document.getElementById('status');
 
-  let activeMaskImg = null;
-  let activeBgMedia = null;
-  let showCamera = true;
-  let useAICrop = true;
-  let showPoseLines = false;
-  let flipH = false;
-  let flipV = false;
+    canvasElement.width = 500;
+    canvasElement.height = 500;
 
-  let maskScaleW = 1.0;
-  let maskScaleH = 1.0;
-  let maskOffsetX = 0;
-  let maskOffsetY = 0;
-  let maskRotate = 0;
+    const segmentCanvas = document.createElement('canvas');
+    segmentCanvas.width = 500;
+    segmentCanvas.height = 500;
+    const segmentCtx = segmentCanvas.getContext('2d');
 
-  let mouthOffsetX = 0;
-  let mouthOffsetY = 0;
-  let mouthWidthScale = 1.0;
-  let mouthSens = 1.0;
+    const toggleShowCamBtn = document.getElementById('toggleShowCam');
+    const toggleAiCutBtn = document.getElementById('toggleAiCut');
+    const toggleBodyTrackBtn = document.getElementById('toggleBodyTrack');
+    const btnCrop = document.getElementById('btnCrop');
+    const btnFlipH = document.getElementById('btnFlipH');
+    const btnFlipV = document.getElementById('btnFlipV');
+    const resetTouchBtn = document.getElementById('resetTouchBtn');
+    const autoCalibrateBtn = document.getElementById('autoCalibrateBtn');
+    const fullScreenBtn = document.getElementById('fullScreenBtn');
 
-  let maskList = [];
-  let bgList = [];
+    const scaleWidthSlider = document.getElementById('scaleWidthSlider');
+    const scaleHeightSlider = document.getElementById('scaleHeightSlider');
+    const rotationSlider = document.getElementById('rotationSlider');
+    const offsetXSlider = document.getElementById('offsetXSlider');
+    const offsetYSlider = document.getElementById('offsetYSlider');
 
-  let currentFaceLandmarks = null;
-  let currentPoseLandmarks = null;
-  let currentSegmentationMask = null;
+    const mouthXSlider = document.getElementById('mouthXSlider');
+    const mouthYSlider = document.getElementById('mouthYSlider');
+    const mouthWidthSlider = document.getElementById('mouthWidthSlider');
+    const mouthSensSlider = document.getElementById('mouthSensSlider');
 
-  // Touch & Mouse Drag Variables
-  let isDragging = false;
-  let startMouseX = 0, startMouseY = 0;
+    const bgGallery = document.getElementById('bgGallery');
+    const avatarGallery = document.getElementById('avatarGallery');
 
-  window.addEventListener('load', async () => {
-    loadGalleries();
-    initTouchControls();
-    await initPipelines();
-  });
+    let showRealCam = false;
+    let isAiCutOn = false;
+    let isBodyTrackOn = false;
+    let isAiCropOn = false;
+    let flipH = false;
+    let flipV = false;
 
-  async function initPipelines() {
-    const faceMesh = new FaceMesh({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}` });
-    faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5 });
-    faceMesh.onResults((res) => {
-      currentFaceLandmarks = (res.multiFaceLandmarks && res.multiFaceLandmarks.length > 0) ? res.multiFaceLandmarks[0] : null;
-    });
+    let latestSegmentationMask = null;
+    let latestFaceResults = null;
+    let latestPoseResults = null;
 
-    const pose = new Pose({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` });
-    pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.5 });
-    pose.onResults((res) => {
-      currentPoseLandmarks = res.poseLandmarks || null;
-    });
+    let activeBgType = null;
+    let activeBgImage = null;
+    let activeAvatar = null;
 
-    const selfieSeg = new SelfieSegmentation({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${f}` });
-    selfieSeg.setOptions({ modelSelection: 1 });
-    selfieSeg.onResults((res) => {
-      currentSegmentationMask = res.segmentationMask || null;
-      renderAll();
-    });
+    let smoothX = 0, smoothY = 0, smoothAngle = 0, smoothEyeDist = 0;
+    const lerp = (start, end, amt) => (1 - amt) * start + amt * end;
 
-    const camera = new Camera(videoElement, {
-      onFrame: async () => {
-        await faceMesh.send({ image: videoElement });
-        await pose.send({ image: videoElement });
-        await selfieSeg.send({ image: videoElement });
-      },
-      width: 1280, height: 720
-    });
-    camera.start();
-  }
+    let dragOffsetX = 0;
+    let dragOffsetY = 0;
+    let isDragging = false;
+    let startTouchX = 0;
+    let startTouchY = 0;
 
-  function renderAll() {
-    canvasElement.width = previewContainer.clientWidth || 720;
-    canvasElement.height = previewContainer.clientHeight || 1280;
+    let savedBgs = JSON.parse(localStorage.getItem('vtuber_bgs_v21') || '[]');
+    let savedAvatars = JSON.parse(localStorage.getItem('vtuber_avatars_v21') || '[]');
 
-    canvasCtx.save();
-    canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+    const sliders = [scaleWidthSlider, scaleHeightSlider, rotationSlider, offsetXSlider, offsetYSlider, mouthXSlider, mouthYSlider, mouthWidthSlider, mouthSensSlider];
 
-    canvasCtx.translate(flipH ? canvasElement.width : 0, flipV ? canvasElement.height : 0);
-    canvasCtx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
-
-    // 1. Desenează Fundalul Selectat
-    if (activeBgMedia) {
-      canvasCtx.drawImage(activeBgMedia, 0, 0, canvasElement.width, canvasElement.height);
+    function saveState() {
+      const state = {
+        flipH, flipV, showRealCam, isAiCutOn, isBodyTrackOn, isAiCropOn,
+        dragOffsetX, dragOffsetY,
+        activeBgIndex: savedBgs.findIndex(b => (b.type === activeBgType && ((b.type === 'image' && activeBgImage && activeBgImage.src === b.src) || (b.type === 'video' && bgVideoElement.src === b.src)))),
+        activeAvatarIndex: savedAvatars.findIndex(a => activeAvatar && activeAvatar.src === a)
+      };
+      sliders.forEach(s => state[s.id] = s.value);
+      localStorage.setItem('vtuber_app_state_v21', JSON.stringify(state));
     }
 
-    // 2. Desenează Corpul Real (Full Stream sau AI Crop decupat peste fundal)
-    if (showCamera) {
-      if (useAICrop && currentSegmentationMask) {
-        canvasCtx.save();
-        canvasCtx.drawImage(currentSegmentationMask, 0, 0, canvasElement.width, canvasElement.height);
-        canvasCtx.globalCompositeOperation = 'source-in';
-        canvasCtx.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
-        canvasCtx.restore();
-      } else {
-        canvasCtx.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
+    function loadState() {
+      const saved = JSON.parse(localStorage.getItem('vtuber_app_state_v21') || '{}');
+      
+      flipH = saved.flipH || false;
+      flipV = saved.flipV || false;
+      showRealCam = saved.showRealCam || false;
+      isAiCutOn = saved.isAiCutOn || false;
+      isBodyTrackOn = saved.isBodyTrackOn || false;
+      isAiCropOn = saved.isAiCropOn || false;
+
+      dragOffsetX = saved.dragOffsetX || 0;
+      dragOffsetY = saved.dragOffsetY || 0;
+
+      btnFlipH.classList.toggle('active', flipH);
+      btnFlipV.classList.toggle('active', flipV);
+      toggleShowCamBtn.classList.toggle('active', showRealCam);
+      toggleShowCamBtn.innerText = `Camera Reală: ${showRealCam ? 'ON' : 'OFF'}`;
+      toggleAiCutBtn.classList.toggle('active', isAiCutOn);
+      toggleAiCutBtn.innerText = `AI Cut-Off: ${isAiCutOn ? 'ON' : 'OFF'}`;
+      toggleBodyTrackBtn.classList.toggle('active', isBodyTrackOn);
+      toggleBodyTrackBtn.innerText = `Urmărire Corp: ${isBodyTrackOn ? 'ON' : 'OFF'}`;
+      btnCrop.classList.toggle('active', isAiCropOn);
+      btnCrop.innerText = `AI Crop ${isAiCropOn ? 'ON' : 'OFF'}`;
+
+      sliders.forEach(s => {
+        if (saved[s.id] !== undefined) s.value = saved[s.id];
+        s.addEventListener('input', saveState);
+      });
+
+      if (saved.activeBgIndex !== undefined && saved.activeBgIndex >= 0 && savedBgs[saved.activeBgIndex]) {
+        selectBg(savedBgs[saved.activeBgIndex]);
+      }
+
+      if (saved.activeAvatarIndex !== undefined && saved.activeAvatarIndex >= 0 && savedAvatars[saved.activeAvatarIndex]) {
+        selectAvatar(savedAvatars[saved.activeAvatarIndex]);
       }
     }
 
-    // 3. Linii de Urmărire Corp (3D Pose)
-    if (showPoseLines && currentPoseLandmarks) {
-      drawConnectors(canvasCtx, currentPoseLandmarks, POSE_CONNECTIONS, { color: '#00FF00', lineWidth: 3 });
-      drawLandmarks(canvasCtx, currentPoseLandmarks, { color: '#FF0000', lineWidth: 1, radius: 3 });
+    function selectBg(itemData) {
+      activeBgType = itemData.type;
+      if (itemData.type === 'video') {
+        activeBgImage = null;
+        bgVideoElement.src = itemData.src;
+        bgVideoElement.play().catch(e => console.log(e));
+      } else {
+        bgVideoElement.pause();
+        activeBgImage = new Image();
+        activeBgImage.src = itemData.src;
+      }
+      renderGalleries();
+      saveState();
     }
 
-    // 4. Mască + Dynamic Lip-Sync
-    if (currentFaceLandmarks) {
-      drawMaskAndLips(currentFaceLandmarks);
+    function selectAvatar(src) {
+      activeAvatar = new Image();
+      activeAvatar.src = src;
+      renderGalleries();
+      saveState();
     }
 
-    canvasCtx.restore();
-  }
-
-  function drawMaskAndLips(landmarks) {
-    if (!activeMaskImg) return;
-
-    const top = landmarks[10], bottom = landmarks[152], left = landmarks[234], right = landmarks[454];
-    const cx = (((left.x + right.x) / 2) * canvasElement.width) + maskOffsetX;
-    const cy = (((top.y + bottom.y) / 2) * canvasElement.height) + maskOffsetY;
-
-    const baseWidth = Math.hypot((right.x - left.x) * canvasElement.width, (right.y - left.y) * canvasElement.height) * 2.2;
-    const width = baseWidth * maskScaleW;
-    const height = (baseWidth * (activeMaskImg.height / activeMaskImg.width)) * maskScaleH;
-
-    const autoAngle = Math.atan2((right.y - left.y) * canvasElement.height, (right.x - left.x) * canvasElement.width);
-    const totalAngle = autoAngle + (maskRotate * Math.PI / 180);
-
-    canvasCtx.save();
-    canvasCtx.translate(cx, cy);
-    canvasCtx.rotate(totalAngle);
-    canvasCtx.drawImage(activeMaskImg, -width / 2, -height / 2, width, height);
-
-    // Dynamic Lip Sync
-    const upperLip = landmarks[13], lowerLip = landmarks[14];
-    const lipDist = Math.hypot((upperLip.x - lowerLip.x) * canvasElement.width, (upperLip.y - lowerLip.y) * canvasElement.height);
-    const mouthOpenRatio = Math.min(Math.max((lipDist - 2) * 0.15 * mouthSens, 0), 1.5);
-
-    if (mouthOpenRatio > 0.05) {
-      const mouthX = (cx - width / 2) + (width * 0.35) + mouthOffsetX;
-      const mouthY = (cy - height / 2) + (height * 0.60) + mouthOffsetY;
-      const mouthW = (width * 0.30) * mouthWidthScale;
-      const mouthH = (height * 0.18) * mouthOpenRatio;
-
-      canvasCtx.fillStyle = '#000000';
-      canvasCtx.beginPath();
-      canvasCtx.ellipse(mouthX + mouthW / 2, mouthY + mouthH / 2, mouthW / 2, mouthH / 2, 0, 0, Math.PI * 2);
-      canvasCtx.fill();
-    }
-
-    canvasCtx.restore();
-  }
-
-  // Interacțiune Directă cu Mouse / Touch (Drag & Zoom)
-  function initTouchControls() {
-    previewContainer.addEventListener('mousedown', (e) => {
-      isDragging = true;
-      startMouseX = e.clientX - maskOffsetX;
-      startMouseY = e.clientY - maskOffsetY;
+    btnFlipH.addEventListener('click', () => {
+      flipH = !flipH;
+      btnFlipH.classList.toggle('active', flipH);
+      saveState();
     });
 
-    window.addEventListener('mousemove', (e) => {
-      if (!isDragging) return;
-      maskOffsetX = e.clientX - startMouseX;
-      maskOffsetY = e.clientY - startMouseY;
-      document.getElementById('maskOffsetX').value = maskOffsetX;
-      document.getElementById('maskOffsetY').value = maskOffsetY;
+    btnFlipV.addEventListener('click', () => {
+      flipV = !flipV;
+      btnFlipV.classList.toggle('active', flipV);
+      saveState();
     });
 
-    window.addEventListener('mouseup', () => { isDragging = false; });
+    toggleBodyTrackBtn.addEventListener('click', () => {
+      isBodyTrackOn = !isBodyTrackOn;
+      toggleBodyTrackBtn.innerText = `Urmărire Corp: ${isBodyTrackOn ? 'ON' : 'OFF'}`;
+      toggleBodyTrackBtn.classList.toggle('active', isBodyTrackOn);
+      saveState();
+    });
 
-    previewContainer.addEventListener('wheel', (e) => {
+    btnCrop.addEventListener('click', () => {
+      isAiCropOn = !isAiCropOn;
+      btnCrop.innerText = `AI Crop ${isAiCropOn ? 'ON' : 'OFF'}`;
+      btnCrop.classList.toggle('active', isAiCropOn);
+      if (isAiCropOn) {
+        scaleWidthSlider.value = 4.5;
+        scaleHeightSlider.value = 5.0;
+      }
+      saveState();
+    });
+
+    fullScreenBtn.addEventListener('click', () => {
+      if (!document.fullscreenElement) {
+        canvasContainer.requestFullscreen().catch(err => alert("Eroare Full Screen: " + err.message));
+      } else {
+        document.exitFullscreen();
+      }
+    });
+
+    canvasContainer.addEventListener('wheel', (e) => {
       e.preventDefault();
-      const delta = e.deltaY * -0.001;
-      maskScaleW = Math.min(Math.max(0.1, maskScaleW + delta), 4.0);
-      maskScaleH = Math.min(Math.max(0.1, maskScaleH + delta), 4.0);
-      document.getElementById('maskScaleW').value = maskScaleW;
-      document.getElementById('maskScaleH').value = maskScaleH;
-      document.getElementById('scaleWVal').innerText = maskScaleW.toFixed(2) + 'x';
-      document.getElementById('scaleHVal').innerText = maskScaleH.toFixed(2) + 'x';
+      let step = e.deltaY < 0 ? 0.2 : -0.2;
+      scaleWidthSlider.value = Math.min(Math.max(0.1, parseFloat(scaleWidthSlider.value) + step), 20).toFixed(1);
+      scaleHeightSlider.value = Math.min(Math.max(0.1, parseFloat(scaleHeightSlider.value) + step), 20).toFixed(1);
+      saveState();
     }, { passive: false });
-  }
 
-  function resetMaskTouch() {
-    maskOffsetX = 0;
-    maskOffsetY = 0;
-    maskScaleW = 1.0;
-    maskScaleH = 1.0;
-    document.getElementById('maskOffsetX').value = 0;
-    document.getElementById('maskOffsetY').value = 0;
-    document.getElementById('maskScaleW').value = 1.0;
-    document.getElementById('maskScaleH').value = 1.0;
-    document.getElementById('scaleWVal').innerText = '1.00x';
-    document.getElementById('scaleHVal').innerText = '1.00x';
-  }
-
-  // Control Butoane
-  function toggleCameraReal() {
-    showCamera = !showCamera;
-    const b = document.getElementById('btnCamera');
-    b.innerText = `Camera Reală: ${showCamera ? 'ON' : 'OFF'}`;
-    b.classList.toggle('active', showCamera);
-  }
-
-  function toggleCropAI() {
-    useAICrop = !useAICrop;
-    const b = document.getElementById('btnCrop');
-    b.innerText = `AI Cut-Off Corp: ${useAICrop ? 'ON' : 'OFF'}`;
-    b.classList.toggle('active', useAICrop);
-  }
-
-  function togglePoseLines() {
-    showPoseLines = !showPoseLines;
-    const b = document.getElementById('btnPose');
-    b.innerText = `Urmărire Corp: ${showPoseLines ? 'ON' : 'OFF'}`;
-    b.classList.toggle('active', showPoseLines);
-  }
-
-  function toggleFlipH() {
-    flipH = !flipH;
-    document.getElementById('btnFlipH').classList.toggle('active', flipH);
-  }
-
-  function toggleFlipV() {
-    flipV = !flipV;
-    document.getElementById('btnFlipV').classList.toggle('active', flipV);
-  }
-
-  function toggleFullscreen() {
-    if (!document.fullscreenElement) {
-      if (previewContainer.requestFullscreen) previewContainer.requestFullscreen();
-      else if (previewContainer.webkitRequestFullscreen) previewContainer.webkitRequestFullscreen();
-    } else {
-      if (document.exitFullscreen) document.exitFullscreen();
+    function handlePointerDown(clientX, clientY) {
+      isDragging = true;
+      startTouchX = clientX;
+      startTouchY = clientY;
     }
-  }
 
-  // Sliders Handlers
-  document.getElementById('maskScaleW').addEventListener('input', (e) => {
-    maskScaleW = parseFloat(e.target.value);
-    document.getElementById('scaleWVal').innerText = maskScaleW.toFixed(2) + 'x';
-  });
-  document.getElementById('maskScaleH').addEventListener('input', (e) => {
-    maskScaleH = parseFloat(e.target.value);
-    document.getElementById('scaleHVal').innerText = maskScaleH.toFixed(2) + 'x';
-  });
-  document.getElementById('maskOffsetX').addEventListener('input', (e) => maskOffsetX = parseInt(e.target.value));
-  document.getElementById('maskOffsetY').addEventListener('input', (e) => maskOffsetY = parseInt(e.target.value));
-  document.getElementById('maskRotate').addEventListener('input', (e) => maskRotate = parseInt(e.target.value));
+    function handlePointerMove(clientX, clientY) {
+      if (!isDragging) return;
+      const rect = canvasContainer.getBoundingClientRect();
+      const deltaX = (clientX - startTouchX) * (canvasElement.width / rect.width);
+      const deltaY = (clientY - startTouchY) * (canvasElement.height / rect.height);
 
-  document.getElementById('mouthOffsetX').addEventListener('input', (e) => mouthOffsetX = parseInt(e.target.value));
-  document.getElementById('mouthOffsetY').addEventListener('input', (e) => mouthOffsetY = parseInt(e.target.value));
-  document.getElementById('mouthWidthScale').addEventListener('input', (e) => {
-    mouthWidthScale = parseFloat(e.target.value);
-    document.getElementById('mouthWidthVal').innerText = mouthWidthScale.toFixed(2) + 'x';
-  });
-  document.getElementById('mouthSens').addEventListener('input', (e) => {
-    mouthSens = parseFloat(e.target.value);
-    document.getElementById('mouthSensVal').innerText = mouthSens.toFixed(1) + 'x';
-  });
+      dragOffsetX += deltaX;
+      dragOffsetY += deltaY;
 
-  // Upload & Salvare Galerii
-  document.getElementById('maskUpload').addEventListener('change', (e) => {
-    Array.from(e.target.files).forEach(file => {
-      const reader = new FileReader();
-      reader.onload = (ev) => { maskList.push(ev.target.result); saveGalleries(); renderMaskGallery(); };
-      reader.readAsDataURL(file);
+      startTouchX = clientX;
+      startTouchY = clientY;
+      saveState();
+    }
+
+    function handlePointerUp() { isDragging = false; }
+
+    canvasContainer.addEventListener('mousedown', (e) => handlePointerDown(e.clientX, e.clientY));
+    window.addEventListener('mousemove', (e) => handlePointerMove(e.clientX, e.clientY));
+    window.addEventListener('mouseup', handlePointerUp);
+
+    canvasContainer.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 1) handlePointerDown(e.touches[0].clientX, e.touches[0].clientY);
+    }, { passive: true });
+
+    window.addEventListener('touchmove', (e) => {
+      if (e.touches.length === 1) handlePointerMove(e.touches[0].clientX, e.touches[0].clientY);
+    }, { passive: true });
+
+    window.addEventListener('touchend', handlePointerUp);
+
+    resetTouchBtn.addEventListener('click', () => {
+      dragOffsetX = 0;
+      dragOffsetY = 0;
+      offsetXSlider.value = 0;
+      offsetYSlider.value = 0;
+      rotationSlider.value = 0;
+      flipH = false;
+      flipV = false;
+      btnFlipH.classList.remove('active');
+      btnFlipV.classList.remove('active');
+      saveState();
     });
-  });
 
-  document.getElementById('bgUpload').addEventListener('change', (e) => {
-    Array.from(e.target.files).forEach(file => {
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        bgList.push({ src: ev.target.result, type: file.type.startsWith('video/') ? 'video' : 'image' });
-        saveGalleries(); renderBgGallery();
-      };
-      reader.readAsDataURL(file);
+    autoCalibrateBtn.addEventListener('click', () => {
+      dragOffsetX = 0;
+      dragOffsetY = 0;
+      offsetXSlider.value = 0;
+      offsetYSlider.value = 0;
+      scaleWidthSlider.value = 4.0;
+      scaleHeightSlider.value = 4.5;
+      saveState();
+      statusEl.innerText = "Centrat & Scalat cu succes! 🎯";
+      statusEl.style.color = '#22c55e';
     });
-  });
 
-  function renderMaskGallery() {
-    const container = document.getElementById('maskGallery');
-    container.innerHTML = '';
-    maskList.forEach((src, idx) => {
-      const div = document.createElement('div');
-      div.className = 'gallery-item';
-      div.innerHTML = `<img src="${src}"><button class="btn-delete" onclick="deleteMask(${idx}, event)">X</button>`;
-      div.onclick = () => {
-        document.querySelectorAll('#maskGallery .gallery-item').forEach(el => el.classList.remove('active'));
-        div.classList.add('active');
-        const img = new Image();
-        img.src = src; img.onload = () => { activeMaskImg = img; };
-      };
-      container.appendChild(div);
-    });
-  }
+    function renderGalleries() {
+      try {
+        localStorage.setItem('vtuber_bgs_v21', JSON.stringify(savedBgs));
+        localStorage.setItem('vtuber_avatars_v21', JSON.stringify(savedAvatars));
+      } catch(e) {
+        console.warn("Memorie stocare plină.");
+      }
 
-  function renderBgGallery() {
-    const container = document.getElementById('bgGallery');
-    container.innerHTML = '';
-    bgList.forEach((item, idx) => {
-      const div = document.createElement('div');
-      div.className = 'gallery-item';
-      div.innerHTML = item.type === 'video' 
-        ? `<video src="${item.src}" muted loop></video><button class="btn-delete" onclick="deleteBg(${idx}, event)">X</button>`
-        : `<img src="${item.src}"><button class="btn-delete" onclick="deleteBg(${idx}, event)">X</button>`;
-      
-      div.onclick = () => {
-        document.querySelectorAll('#bgGallery .gallery-item').forEach(el => el.classList.remove('active'));
-        div.classList.add('active');
-        if (item.type === 'video') {
-          const v = document.createElement('video');
-          v.src = item.src; v.autoplay = true; v.loop = true; v.muted = true; v.play();
-          activeBgMedia = v;
-        } else {
-          const img = new Image();
-          img.src = item.src; img.onload = () => { activeBgMedia = img; };
+      bgGallery.innerHTML = '';
+      savedBgs.forEach((itemData, idx) => {
+        const item = document.createElement('div');
+        const isActive = (activeBgType === itemData.type && (
+          (itemData.type === 'image' && activeBgImage && activeBgImage.src === itemData.src) ||
+          (itemData.type === 'video' && bgVideoElement.src === itemData.src)
+        ));
+
+        item.className = 'gallery-item' + (isActive ? ' active' : '');
+        let mediaEl = itemData.type === 'video' ? document.createElement('video') : document.createElement('img');
+        mediaEl.src = itemData.src;
+
+        item.onclick = () => selectBg(itemData);
+
+        const delBtn = document.createElement('button');
+        delBtn.className = 'delete-btn';
+        delBtn.innerText = '✕';
+        delBtn.onclick = (e) => {
+          e.stopPropagation();
+          savedBgs.splice(idx, 1);
+          if (isActive) {
+            activeBgType = null;
+            activeBgImage = null;
+            bgVideoElement.src = '';
+          }
+          renderGalleries();
+          saveState();
+        };
+
+        item.appendChild(mediaEl);
+        item.appendChild(delBtn);
+        bgGallery.appendChild(item);
+      });
+
+      avatarGallery.innerHTML = '';
+      savedAvatars.forEach((src, idx) => {
+        const item = document.createElement('div');
+        const isActive = (activeAvatar && activeAvatar.src === src);
+        item.className = 'gallery-item' + (isActive ? ' active' : '');
+        const img = document.createElement('img');
+        img.src = src;
+
+        item.onclick = () => selectAvatar(src);
+
+        const delBtn = document.createElement('button');
+        delBtn.className = 'delete-btn';
+        delBtn.innerText = '✕';
+        delBtn.onclick = (e) => {
+          e.stopPropagation();
+          if (isActive) activeAvatar = null;
+          savedAvatars.splice(idx, 1);
+          renderGalleries();
+          saveState();
+        };
+
+        item.appendChild(img);
+        item.appendChild(delBtn);
+        avatarGallery.appendChild(item);
+      });
+    }
+
+    document.getElementById('bgLoader').addEventListener('change', (e) => {
+      const files = Array.from(e.target.files);
+      files.forEach(file => {
+        if (savedBgs.length >= 10) {
+          alert("A fost atinsă limita de 10 fundaluri!");
+          return;
         }
-      };
-      container.appendChild(div);
+        const isVideo = file.type.startsWith('video/');
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          const bgData = { type: isVideo ? 'video' : 'image', src: evt.target.result };
+          savedBgs.push(bgData);
+          selectBg(bgData);
+        };
+        reader.readAsDataURL(file);
+      });
     });
-  }
 
-  function deleteMask(idx, e) {
-    e.stopPropagation();
-    maskList.splice(idx, 1);
-    if (maskList.length === 0) activeMaskImg = null;
-    saveGalleries(); renderMaskGallery();
-  }
+    document.getElementById('avatarLoader').addEventListener('change', (e) => {
+      const files = Array.from(e.target.files);
+      files.forEach(file => {
+        if (savedAvatars.length >= 10) {
+          alert("A fost atinsă limita de 10 măști!");
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          savedAvatars.push(evt.target.result);
+          selectAvatar(evt.target.result);
+        };
+        reader.readAsDataURL(file);
+      });
+    });
 
-  function deleteBg(idx, e) {
-    e.stopPropagation();
-    bgList.splice(idx, 1);
-    if (bgList.length === 0) activeBgMedia = null;
-    saveGalleries(); renderBgGallery();
-  }
+    toggleShowCamBtn.addEventListener('click', () => {
+      showRealCam = !showRealCam;
+      toggleShowCamBtn.innerText = `Camera Reală: ${showRealCam ? 'ON' : 'OFF'}`;
+      toggleShowCamBtn.classList.toggle('active', showRealCam);
+      saveState();
+    });
 
-  function saveGalleries() {
-    try {
-      localStorage.setItem('vt_masks', JSON.stringify(maskList));
-      localStorage.setItem('vt_bgs', JSON.stringify(bgList));
-    } catch (err) {}
-  }
+    toggleAiCutBtn.addEventListener('click', () => {
+      isAiCutOn = !isAiCutOn;
+      toggleAiCutBtn.innerText = `AI Cut-Off: ${isAiCutOn ? 'ON' : 'OFF'}`;
+      toggleAiCutBtn.classList.toggle('active', isAiCutOn);
+      saveState();
+    });
 
-  function loadGalleries() {
-    const m = localStorage.getItem('vt_masks');
-    const b = localStorage.getItem('vt_bgs');
-    if (m) { maskList = JSON.parse(m); renderMaskGallery(); }
-    if (b) { bgList = JSON.parse(b); renderBgGallery(); }
-  }
+    const selfieSegmentation = new SelfieSegmentation({
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`
+    });
+    selfieSegmentation.setOptions({ modelSelection: 1 });
+    selfieSegmentation.onResults((results) => {
+      latestSegmentationMask = results.segmentationMask;
+    });
 
-  // Înregistrare MP4
-  let mediaRecorder = null, recordedChunks = [], isRecording = false;
+    const faceMesh = new FaceMesh({
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
+    });
+    faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+    faceMesh.onResults((results) => {
+      latestFaceResults = results;
+      drawScene();
+    });
 
-  function toggleRecording() {
-    if (!isRecording) startRecording();
-    else stopRecording();
-  }
+    const pose = new Pose({
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
+    });
+    pose.setOptions({ modelComplexity: 0, smoothLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+    pose.onResults((results) => {
+      latestPoseResults = results;
+    });
 
-  function startRecording() {
-    recordedChunks = [];
-    const stream = canvasElement.captureStream(30);
-    let mimeType = 'video/mp4';
-    if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'video/webm;codecs=h264';
+    function drawScene() {
+      statusEl.innerText = "Camera Activă 🟢";
+      statusEl.style.color = '#22c55e';
+      canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
 
-    mediaRecorder = new MediaRecorder(stream, { mimeType });
-    mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
-    mediaRecorder.onstop = downloadVideo;
+      // 1. Randare Fundal
+      if (activeBgType === 'video' && bgVideoElement.readyState >= 2) {
+        canvasCtx.drawImage(bgVideoElement, 0, 0, canvasElement.width, canvasElement.height);
+      } else if (activeBgType === 'image' && activeBgImage && activeBgImage.complete) {
+        canvasCtx.drawImage(activeBgImage, 0, 0, canvasElement.width, canvasElement.height);
+      } else {
+        canvasCtx.fillStyle = '#050811';
+        canvasCtx.fillRect(0, 0, canvasElement.width, canvasElement.height);
+      }
 
-    mediaRecorder.start();
-    isRecording = true;
-    document.getElementById('recordBtn').classList.add('recording');
-    document.getElementById('recordText').innerText = "Stop & Salvează";
-  }
+      // 2. Randare Corp Real (Camera Web cu sau fără decupaj AI)
+      if (showRealCam && videoElement.readyState >= 2) {
+        canvasCtx.save();
+        if (isAiCutOn && latestSegmentationMask) {
+          segmentCtx.clearRect(0, 0, segmentCanvas.width, segmentCanvas.height);
+          segmentCtx.drawImage(latestSegmentationMask, 0, 0, segmentCanvas.width, segmentCanvas.height);
+          segmentCtx.globalCompositeOperation = 'source-in';
+          segmentCtx.drawImage(videoElement, 0, 0, segmentCanvas.width, segmentCanvas.height);
+          segmentCtx.globalCompositeOperation = 'source-over';
+          canvasCtx.drawImage(segmentCanvas, 0, 0, canvasElement.width, canvasElement.height);
+        } else {
+          canvasCtx.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
+        }
+        canvasCtx.restore();
+      }
 
-  function stopRecording() {
-    if (mediaRecorder && isRecording) {
-      mediaRecorder.stop();
-      isRecording = false;
-      document.getElementById('recordBtn').classList.remove('recording');
-      document.getElementById('recordText').innerText = "Record MP4";
+      // 3. Body Line Tracking
+      if (isBodyTrackOn && latestPoseResults && latestPoseResults.poseLandmarks) {
+        const lm = latestPoseResults.poseLandmarks;
+        canvasCtx.save();
+        [lm[11], lm[12], lm[15], lm[16]].forEach((pt, i) => {
+          if (pt && pt.visibility > 0.5) {
+            canvasCtx.beginPath();
+            canvasCtx.arc(pt.x * canvasElement.width, pt.y * canvasElement.height, i < 2 ? 8 : 12, 0, Math.PI * 2);
+            canvasCtx.fillStyle = i < 2 ? '#0284c7' : '#ef4444';
+            canvasCtx.fill();
+          }
+        });
+        canvasCtx.restore();
+      }
+
+      // 4. Randare Mască / Avatar PNG peste Față
+      if (latestFaceResults && latestFaceResults.multiFaceLandmarks && latestFaceResults.multiFaceLandmarks.length > 0) {
+        const landmarks = latestFaceResults.multiFaceLandmarks[0];
+
+        const lipTop = landmarks[13];
+        const lipBottom = landmarks[14];
+        const jawDist = Math.hypot(lipTop.x - lipBottom.x, lipTop.y - lipBottom.y);
+        const sens = parseFloat(mouthSensSlider.value);
+        const jawOpenValue = Math.min(Math.max((jawDist - 0.015) * sens, 0), 1);
+
+        const leftEye = landmarks[33];
+        const rightEye = landmarks[263];
+        const nose = landmarks[1];
+
+        const dx = (rightEye.x - leftEye.x) * canvasElement.width;
+        const dy = (rightEye.y - leftEye.y) * canvasElement.height;
+        const targetAngle = Math.atan2(dy, dx);
+        const targetEyeDist = Math.hypot(dx, dy);
+
+        const offX = parseFloat(offsetXSlider.value) + dragOffsetX;
+        const offY = parseFloat(offsetYSlider.value) + dragOffsetY;
+        const targetX = nose.x * canvasElement.width + offX;
+        const targetY = nose.y * canvasElement.height + offY;
+
+        smoothX = lerp(smoothX || targetX, targetX, 0.85);
+        smoothY = lerp(smoothY || targetY, targetY, 0.85);
+        smoothAngle = lerp(smoothAngle || targetAngle, targetAngle, 0.85);
+        smoothEyeDist = lerp(smoothEyeDist || targetEyeDist, targetEyeDist, 0.85);
+
+        const scaleW = parseFloat(scaleWidthSlider.value);
+        const scaleH = parseFloat(scaleHeightSlider.value);
+        const manualRot = (parseFloat(rotationSlider.value) * Math.PI) / 180;
+
+        const maskWidth = smoothEyeDist * scaleW;
+        const maskHeight = smoothEyeDist * scaleH;
+
+        if (activeAvatar && activeAvatar.complete) {
+          canvasCtx.save();
+          canvasCtx.translate(smoothX, smoothY);
+          canvasCtx.rotate(smoothAngle + manualRot);
+          canvasCtx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
+
+          canvasCtx.drawImage(activeAvatar, -maskWidth / 2, -maskHeight / 2, maskWidth, maskHeight);
+
+          const lipCenterY = (lipTop.y + lipBottom.y) / 2;
+          const autoMouthY = (lipCenterY - nose.y) * canvasElement.height;
+
+          const fineX = parseFloat(mouthXSlider.value);
+          const fineY = parseFloat(mouthYSlider.value);
+          const finalMouthX = fineX;
+          const finalMouthY = autoMouthY + fineY;
+
+          const mWidth = parseFloat(mouthWidthSlider.value);
+          const mouthOpenH = Math.max(2, jawOpenValue * 25);
+
+          canvasCtx.beginPath();
+          canvasCtx.ellipse(finalMouthX, finalMouthY, mWidth / 2, mouthOpenH / 2, 0, 0, Math.PI * 2);
+          canvasCtx.fillStyle = '#050811';
+          canvasCtx.fill();
+
+          canvasCtx.restore();
+        }
+      }
     }
-  }
 
-  function downloadVideo() {
-    const blob = new Blob(recordedChunks, { type: 'video/mp4' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `VTuber_Record_${Date.now()}.mp4`;
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => { document.body.removeChild(a); window.URL.revokeObjectURL(url); }, 100);
-  }
-</script>
+    async function initCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 500, height: 500 } });
+        videoElement.srcObject = stream;
+        await videoElement.play();
+
+        const processFrame = async () => {
+          if (videoElement.readyState >= 2) {
+            try {
+              if (isAiCutOn || showRealCam) {
+                await selfieSegmentation.send({ image: videoElement });
+              }
+              if (isBodyTrackOn) {
+                await pose.send({ image: videoElement });
+              }
+              await faceMesh.send({ image: videoElement });
+            } catch(err) {
+              console.error(err);
+            }
+          }
+          requestAnimationFrame(processFrame);
+        };
+        processFrame();
+      } catch(err) {
+        statusEl.innerText = "Eroare la pornirea camerei! Verificați permisiunile.";
+        statusEl.style.color = '#ef4444';
+      }
+    }
+
+    loadState();
+    renderGalleries();
+    initCamera();
+  </script>
 </body>
 </html>
