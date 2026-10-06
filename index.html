@@ -3,12 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>VTuber Studio - Interfață Originală Full Body & Lip Sync</title>
+  <title>VTuber Studio - AI Crop Corp & Free-Form Controls</title>
   
-  <!-- MediaPipe Libraries (FaceMesh + Pose) -->
+  <!-- MediaPipe Libraries (FaceMesh + Pose + Selfie Segmentation) -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
 
   <style>
@@ -20,7 +21,6 @@
       overflow-y: auto; overflow-x: hidden;
     }
 
-    /* Container Video Vertical */
     #preview-container {
       position: relative;
       width: 100%;
@@ -32,9 +32,10 @@
       border-radius: 10px;
       overflow: hidden;
       box-shadow: 0 0 15px rgba(0, 162, 255, 0.25);
+      cursor: grab;
     }
+    #preview-container:active { cursor: grabbing; }
 
-    /* Fullscreen complet pe tot ecranul (fara margini negre) */
     :fullscreen #preview-container, :-webkit-full-screen #preview-container {
       max-width: 100vw; width: 100vw; height: 100vh;
       margin: 0; border: none; border-radius: 0;
@@ -47,7 +48,6 @@
     }
     video { display: none; }
 
-    /* Controls Overlay */
     #overlay-controls {
       position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
       z-index: 50; display: flex; align-items: center; gap: 10px;
@@ -55,7 +55,6 @@
       border: 1px solid rgba(0,162,255,0.4);
     }
 
-    /* Panoul de Control Clasic Anterior */
     #main-panel {
       width: 100%; max-width: 520px; padding: 15px;
       display: flex; flex-direction: column; gap: 10px;
@@ -83,7 +82,6 @@
     .slider-row { display: flex; justify-content: space-between; font-size: 11px; color: #ccc; }
     input[type="range"] { width: 100%; accent-color: #00a2ff; cursor: pointer; }
 
-    /* Galerii Miniaturi cu buton X */
     .gallery-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-top: 6px; }
     .gallery-item {
       position: relative; width: 100%; aspect-ratio: 1; border-radius: 4px; overflow: hidden;
@@ -120,7 +118,6 @@
 </head>
 <body>
 
-  <!-- Previzualizare Monitor / Telefon -->
   <div id="preview-container">
     <video id="webcam" playsinline></video>
     <canvas id="output_canvas"></canvas>
@@ -134,12 +131,16 @@
     </div>
   </div>
 
-  <!-- Interfața Clasic Refăcută -->
   <div id="main-panel">
 
     <div class="btn-grid">
       <button id="btnCamera" class="btn-action active" onclick="toggleCameraReal()">Camera Reală: ON</button>
+      <button id="btnCrop" class="btn-action active" onclick="toggleCropAI()">AI Cut-Off Corp: ON</button>
+    </div>
+
+    <div class="btn-grid">
       <button id="btnPose" class="btn-action" onclick="togglePoseLines()">Urmărire Corp: OFF</button>
+      <button id="btnResetTouch" class="btn-action" onclick="resetMaskTouch()">Reset Poziție Touch</button>
     </div>
 
     <div class="btn-grid">
@@ -149,7 +150,6 @@
 
     <button class="btn-action btn-green" onclick="toggleFullscreen()">📺 Full Screen (Ecran Complet)</button>
 
-    <!-- GALERIE FUNDAL SCENĂ -->
     <div class="section-title">🖼️ / 🎥 Fundal Scenă (Max 10)</div>
     <label class="upload-btn">
       + Upload Fundal Nou (Foto / Video)
@@ -157,7 +157,6 @@
     </label>
     <div id="bgGallery" class="gallery-grid"></div>
 
-    <!-- GALERIE MĂȘTI -->
     <div class="section-title">🎭 Avatar / Mască PNG (Max 10)</div>
     <label class="upload-btn">
       + Upload Mască Nouă (PNG)
@@ -165,7 +164,6 @@
     </label>
     <div id="maskGallery" class="gallery-grid"></div>
 
-    <!-- CALIBRARE MASCĂ -->
     <div class="section-title">⚙ Calibrare Mască (Zoom / Scale)</div>
     
     <div class="slider-group">
@@ -193,7 +191,6 @@
       <input type="range" id="maskRotate" min="-180" max="180" step="1" value="0">
     </div>
 
-    <!-- AJUSTARE FINĂ GURĂ / MAPARE BUZE -->
     <div class="section-title">👄 Ajustare Fină Gură / Lip-Sync</div>
 
     <div class="slider-group">
@@ -227,6 +224,7 @@
   let activeMaskImg = null;
   let activeBgMedia = null;
   let showCamera = true;
+  let useAICrop = true;
   let showPoseLines = false;
   let flipH = false;
   let flipV = false;
@@ -247,9 +245,15 @@
 
   let currentFaceLandmarks = null;
   let currentPoseLandmarks = null;
+  let currentSegmentationMask = null;
+
+  // Touch & Mouse Drag Variables
+  let isDragging = false;
+  let startMouseX = 0, startMouseY = 0;
 
   window.addEventListener('load', async () => {
     loadGalleries();
+    initTouchControls();
     await initPipelines();
   });
 
@@ -264,6 +268,12 @@
     pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.5 });
     pose.onResults((res) => {
       currentPoseLandmarks = res.poseLandmarks || null;
+    });
+
+    const selfieSeg = new SelfieSegmentation({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${f}` });
+    selfieSeg.setOptions({ modelSelection: 1 });
+    selfieSeg.onResults((res) => {
+      currentSegmentationMask = res.segmentationMask || null;
       renderAll();
     });
 
@@ -271,6 +281,7 @@
       onFrame: async () => {
         await faceMesh.send({ image: videoElement });
         await pose.send({ image: videoElement });
+        await selfieSeg.send({ image: videoElement });
       },
       width: 1280, height: 720
     });
@@ -284,27 +295,34 @@
     canvasCtx.save();
     canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
 
-    // Transformari Oglindire / Rasturnare
     canvasCtx.translate(flipH ? canvasElement.width : 0, flipV ? canvasElement.height : 0);
     canvasCtx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
 
-    // 1. Deseneaza Fundalul
+    // 1. Desenează Fundalul Selectat
     if (activeBgMedia) {
       canvasCtx.drawImage(activeBgMedia, 0, 0, canvasElement.width, canvasElement.height);
     }
 
-    // 2. Deseneaza Corpul Real (Webcam Stream)
+    // 2. Desenează Corpul Real (Full Stream sau AI Crop decupat peste fundal)
     if (showCamera) {
-      canvasCtx.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
+      if (useAICrop && currentSegmentationMask) {
+        canvasCtx.save();
+        canvasCtx.drawImage(currentSegmentationMask, 0, 0, canvasElement.width, canvasElement.height);
+        canvasCtx.globalCompositeOperation = 'source-in';
+        canvasCtx.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
+        canvasCtx.restore();
+      } else {
+        canvasCtx.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
+      }
     }
 
-    // 3. Deseneaza Liniile/Punctele Verzi de Corp (Pose Tracking 3D)
+    // 3. Linii de Urmărire Corp (3D Pose)
     if (showPoseLines && currentPoseLandmarks) {
       drawConnectors(canvasCtx, currentPoseLandmarks, POSE_CONNECTIONS, { color: '#00FF00', lineWidth: 3 });
       drawLandmarks(canvasCtx, currentPoseLandmarks, { color: '#FF0000', lineWidth: 1, radius: 3 });
     }
 
-    // 4. Deseneaza Masca si Maparea pe Buze
+    // 4. Mască + Dynamic Lip-Sync
     if (currentFaceLandmarks) {
       drawMaskAndLips(currentFaceLandmarks);
     }
@@ -326,13 +344,12 @@
     const autoAngle = Math.atan2((right.y - left.y) * canvasElement.height, (right.x - left.x) * canvasElement.width);
     const totalAngle = autoAngle + (maskRotate * Math.PI / 180);
 
-    // Baza Măștii
     canvasCtx.save();
     canvasCtx.translate(cx, cy);
     canvasCtx.rotate(totalAngle);
     canvasCtx.drawImage(activeMaskImg, -width / 2, -height / 2, width, height);
 
-    // Mapare Fină Deschidere Gură (Lip Sync Dynamic Crop)
+    // Dynamic Lip Sync
     const upperLip = landmarks[13], lowerLip = landmarks[14];
     const lipDist = Math.hypot((upperLip.x - lowerLip.x) * canvasElement.width, (upperLip.y - lowerLip.y) * canvasElement.height);
     const mouthOpenRatio = Math.min(Math.max((lipDist - 2) * 0.15 * mouthSens, 0), 1.5);
@@ -352,12 +369,62 @@
     canvasCtx.restore();
   }
 
-  // Comutatoare Butoane
+  // Interacțiune Directă cu Mouse / Touch (Drag & Zoom)
+  function initTouchControls() {
+    previewContainer.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      startMouseX = e.clientX - maskOffsetX;
+      startMouseY = e.clientY - maskOffsetY;
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      maskOffsetX = e.clientX - startMouseX;
+      maskOffsetY = e.clientY - startMouseY;
+      document.getElementById('maskOffsetX').value = maskOffsetX;
+      document.getElementById('maskOffsetY').value = maskOffsetY;
+    });
+
+    window.addEventListener('mouseup', () => { isDragging = false; });
+
+    previewContainer.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const delta = e.deltaY * -0.001;
+      maskScaleW = Math.min(Math.max(0.1, maskScaleW + delta), 4.0);
+      maskScaleH = Math.min(Math.max(0.1, maskScaleH + delta), 4.0);
+      document.getElementById('maskScaleW').value = maskScaleW;
+      document.getElementById('maskScaleH').value = maskScaleH;
+      document.getElementById('scaleWVal').innerText = maskScaleW.toFixed(2) + 'x';
+      document.getElementById('scaleHVal').innerText = maskScaleH.toFixed(2) + 'x';
+    }, { passive: false });
+  }
+
+  function resetMaskTouch() {
+    maskOffsetX = 0;
+    maskOffsetY = 0;
+    maskScaleW = 1.0;
+    maskScaleH = 1.0;
+    document.getElementById('maskOffsetX').value = 0;
+    document.getElementById('maskOffsetY').value = 0;
+    document.getElementById('maskScaleW').value = 1.0;
+    document.getElementById('maskScaleH').value = 1.0;
+    document.getElementById('scaleWVal').innerText = '1.00x';
+    document.getElementById('scaleHVal').innerText = '1.00x';
+  }
+
+  // Control Butoane
   function toggleCameraReal() {
     showCamera = !showCamera;
     const b = document.getElementById('btnCamera');
     b.innerText = `Camera Reală: ${showCamera ? 'ON' : 'OFF'}`;
     b.classList.toggle('active', showCamera);
+  }
+
+  function toggleCropAI() {
+    useAICrop = !useAICrop;
+    const b = document.getElementById('btnCrop');
+    b.innerText = `AI Cut-Off Corp: ${useAICrop ? 'ON' : 'OFF'}`;
+    b.classList.toggle('active', useAICrop);
   }
 
   function togglePoseLines() {
@@ -386,7 +453,7 @@
     }
   }
 
-  // Listeners Sliders
+  // Sliders Handlers
   document.getElementById('maskScaleW').addEventListener('input', (e) => {
     maskScaleW = parseFloat(e.target.value);
     document.getElementById('scaleWVal').innerText = maskScaleW.toFixed(2) + 'x';
@@ -410,7 +477,7 @@
     document.getElementById('mouthSensVal').innerText = mouthSens.toFixed(1) + 'x';
   });
 
-  // Salvare & Galerie
+  // Upload & Salvare Galerii
   document.getElementById('maskUpload').addEventListener('change', (e) => {
     Array.from(e.target.files).forEach(file => {
       const reader = new FileReader();
@@ -501,7 +568,7 @@
     if (b) { bgList = JSON.parse(b); renderBgGallery(); }
   }
 
-  // Inregistrare MP4
+  // Înregistrare MP4
   let mediaRecorder = null, recordedChunks = [], isRecording = false;
 
   function toggleRecording() {
