@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>VTuber Studio v2.4 - Record MP4 & Body Skeleton</title>
+  <title>VTuber Studio v2.5 - Camera Fixed & Record MP4</title>
 
   <!-- MediaPipe CDNs -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
@@ -206,7 +206,7 @@
 </head>
 <body>
 
-  <h3>🎭 VTuber Studio <span class="version-tag">v2.4</span></h3>
+  <h3>🎭 VTuber Studio <span class="version-tag">v2.5</span></h3>
 
   <div class="canvas-container" id="canvasContainer">
     <video id="webcam" playsinline muted></video>
@@ -217,7 +217,7 @@
   <div class="controls-panel">
     
     <div class="btn-group">
-      <button id="recordBtn" class="btn btn-full btn-record">⏺️ Începe Înregistrarea Video (MP4)</button>
+      <button id="recordBtn" class="btn btn-full btn-record">⏺️️ Începe Înregistrarea Video (MP4)</button>
       <button id="toggleShowCam" class="btn">Camera Reală: OFF</button>
       <button id="toggleAiCut" class="btn">AI Cut-Off: OFF</button>
       <button id="toggleBodyTrack" class="btn">Urmărire Corp: OFF</button>
@@ -365,8 +365,8 @@
     let startTouchX = 0;
     let startTouchY = 0;
 
-    let savedBgs = JSON.parse(localStorage.getItem('vtuber_bgs_v24') || '[]');
-    let savedAvatars = JSON.parse(localStorage.getItem('vtuber_avatars_v24') || '[]');
+    let savedBgs = JSON.parse(localStorage.getItem('vtuber_bgs_v25') || '[]');
+    let savedAvatars = JSON.parse(localStorage.getItem('vtuber_avatars_v25') || '[]');
 
     const sliders = [scaleWidthSlider, scaleHeightSlider, rotationSlider, offsetXSlider, offsetYSlider, mouthXSlider, mouthYSlider, mouthWidthSlider, mouthSensSlider];
 
@@ -378,11 +378,11 @@
         activeAvatarIndex: savedAvatars.findIndex(a => activeAvatar && activeAvatar.src === a)
       };
       sliders.forEach(s => state[s.id] = s.value);
-      localStorage.setItem('vtuber_app_state_v24', JSON.stringify(state));
+      localStorage.setItem('vtuber_app_state_v25', JSON.stringify(state));
     }
 
     function loadState() {
-      const saved = JSON.parse(localStorage.getItem('vtuber_app_state_v24') || '{}');
+      const saved = JSON.parse(localStorage.getItem('vtuber_app_state_v25') || '{}');
       
       flipH = saved.flipH || false;
       flipV = saved.flipV || false;
@@ -419,7 +419,7 @@
       }
     }
 
-    // --- Inregistrare Video MP4 ---
+    // --- Înregistrare Video MP4 ---
     recordBtn.addEventListener('click', () => {
       if (!isRecording) {
         startRecording();
@@ -461,7 +461,7 @@
         mediaRecorder.stop();
         isRecording = false;
         recordBtn.classList.remove('recording');
-        recordBtn.innerText = '⏺️ Începe Înregistrarea Video (MP4)';
+        recordBtn.innerText = '⏺️️ Începe Înregistrarea Video (MP4)';
       }
     }
 
@@ -471,7 +471,7 @@
       const a = document.createElement('a');
       a.style.display = 'none';
       a.href = url;
-      a.download = `VTuber_Studio_v2.4_${Date.now()}.mp4`;
+      a.download = `VTuber_Studio_v2.5_${Date.now()}.mp4`;
       document.body.appendChild(a);
       a.click();
       setTimeout(() => {
@@ -611,8 +611,8 @@
 
     function renderGalleries() {
       try {
-        localStorage.setItem('vtuber_bgs_v24', JSON.stringify(savedBgs));
-        localStorage.setItem('vtuber_avatars_v24', JSON.stringify(savedAvatars));
+        localStorage.setItem('vtuber_bgs_v25', JSON.stringify(savedBgs));
+        localStorage.setItem('vtuber_avatars_v25', JSON.stringify(savedAvatars));
       } catch(e) {
         console.warn("Memorie stocare plină.");
       }
@@ -740,7 +740,6 @@
     faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
     faceMesh.onResults((results) => {
       latestFaceResults = results;
-      drawScene();
     });
 
     const pose = new Pose({
@@ -873,11 +872,36 @@
         videoElement.srcObject = stream;
         await videoElement.play();
 
-        const processFrame = async () => {
-          if (videoElement.readyState >= 2) {
-            try {
-              if (isAiCutOn || showRealCam) {
-                await selfieSegmentation.send({ image: videoElement });
-              }
-              if (isBodyTrackOn) {
-                await pose.send({ image: videoElement });
+        const camera = new Camera(videoElement, {
+          onFrame: async () => {
+            if (isAiCutOn || showRealCam) {
+              await selfieSegmentation.send({ image: videoElement });
+            }
+            if (isBodyTrackOn) {
+              await pose.send({ image: videoElement });
+            }
+            await faceMesh.send({ image: videoElement });
+          },
+          width: 500,
+          height: 500
+        });
+        camera.start();
+
+        function renderLoop() {
+          drawScene();
+          requestAnimationFrame(renderLoop);
+        }
+        renderLoop();
+
+      } catch(err) {
+        statusEl.innerText = "Eroare la pornirea camerei! Verificați permisiunile.";
+        statusEl.style.color = '#ef4444';
+      }
+    }
+
+    loadState();
+    renderGalleries();
+    initCamera();
+  </script>
+</body>
+</html>
