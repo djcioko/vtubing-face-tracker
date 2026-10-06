@@ -3,188 +3,217 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>VTuber Studio Vertical - Live TikTok & Events</title>
+  <title>VTuber Studio - Interfață Originală Full Body & Lip Sync</title>
   
-  <!-- MediaPipe Libraries -->
+  <!-- MediaPipe Libraries (FaceMesh + Pose) -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
 
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
     body, html {
-      width: 100%; height: 100%; background: #080b10;
+      width: 100%; height: 100%; background: #06090e;
       font-family: 'Segoe UI', Roboto, sans-serif; color: #fff;
       display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
       overflow-y: auto; overflow-x: hidden;
     }
-    
-    /* Containerul Video / Preview Vertical */
+
+    /* Container Video Vertical */
     #preview-container {
       position: relative;
       width: 100%;
-      max-width: 500px;
-      height: 70vh;
+      max-width: 520px;
+      height: 65vh;
       margin-top: 10px;
       background: #000;
       border: 2px solid #00a2ff;
-      border-radius: 12px;
+      border-radius: 10px;
       overflow: hidden;
-      box-shadow: 0 0 20px rgba(0, 162, 255, 0.3);
+      box-shadow: 0 0 15px rgba(0, 162, 255, 0.25);
     }
 
-    /* Cand se intra in Fullscreen */
+    /* Fullscreen complet pe tot ecranul (fara margini negre) */
     :fullscreen #preview-container, :-webkit-full-screen #preview-container {
-      max-width: 100vw;
-      width: 100vw;
-      height: 100vh;
-      margin: 0;
-      border: none;
-      border-radius: 0;
+      max-width: 100vw; width: 100vw; height: 100vh;
+      margin: 0; border: none; border-radius: 0;
     }
 
     canvas {
       width: 100%; height: 100%;
-      object-fit: cover; /* Umple tot ecranul fara margini negre */
+      object-fit: cover;
       display: block;
     }
     video { display: none; }
 
-    /* Control Overlay in Fullscreen */
+    /* Controls Overlay */
     #overlay-controls {
-      position: absolute; bottom: 15px; left: 50%; transform: translateX(-50%);
+      position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
       z-index: 50; display: flex; align-items: center; gap: 10px;
-      background: rgba(0,0,0,0.75); padding: 8px 16px; border-radius: 30px;
-      border: 1px solid rgba(255,255,255,0.2); backdrop-filter: blur(8px);
+      background: rgba(0,0,0,0.8); padding: 6px 14px; border-radius: 20px;
+      border: 1px solid rgba(0,162,255,0.4);
     }
 
-    /* Panou Control Sub Video (Stilul Clasic) */
+    /* Panoul de Control Clasic Anterior */
     #main-panel {
-      width: 100%; max-width: 500px; padding: 15px;
-      display: flex; flex-direction: column; gap: 12px;
-      margin-bottom: 40px;
+      width: 100%; max-width: 520px; padding: 15px;
+      display: flex; flex-direction: column; gap: 10px;
+      margin-bottom: 50px;
     }
 
-    .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 
     .btn-action {
       background: #0078d4; color: white; border: 1px solid #005a9e;
       padding: 10px; border-radius: 6px; font-weight: bold; cursor: pointer;
       text-align: center; font-size: 13px; transition: 0.2s;
     }
-    .btn-action.active { background: #00a2ff; border-color: #66c2ff; box-shadow: 0 0 10px rgba(0,162,255,0.5); }
-    .btn-green { background: #00b894; border-color: #00cec9; }
+    .btn-action.active { background: #00a2ff; border-color: #66c2ff; box-shadow: 0 0 8px rgba(0,162,255,0.6); }
+    .btn-green { background: #00b894; border-color: #00cec9; color: #fff; }
     .btn-green:hover { background: #00bec9; }
 
     .section-title {
-      font-size: 12px; font-weight: bold; color: #00a2ff;
+      font-size: 11px; font-weight: bold; color: #00a2ff;
       text-transform: uppercase; margin-top: 10px; letter-spacing: 0.5px;
-      border-bottom: 1px solid rgba(0, 162, 255, 0.2); padding-bottom: 4px;
+      border-bottom: 1px solid rgba(0, 162, 255, 0.2); padding-bottom: 3px;
     }
 
-    .slider-group { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
-    .slider-row { display: flex; justify-content: space-between; font-size: 12px; color: #aaa; }
+    .slider-group { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
+    .slider-row { display: flex; justify-content: space-between; font-size: 11px; color: #ccc; }
     input[type="range"] { width: 100%; accent-color: #00a2ff; cursor: pointer; }
 
-    /* Galeriile cu miniaturi */
-    .gallery-grid {
-      display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 8px;
-    }
+    /* Galerii Miniaturi cu buton X */
+    .gallery-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-top: 6px; }
     .gallery-item {
-      position: relative; width: 100%; aspect-ratio: 1; border-radius: 6px; overflow: hidden;
+      position: relative; width: 100%; aspect-ratio: 1; border-radius: 4px; overflow: hidden;
       border: 2px solid #333; cursor: pointer; background: #111;
     }
-    .gallery-item.active { border-color: #00a2ff; box-shadow: 0 0 8px #00a2ff; }
+    .gallery-item.active { border-color: #00a2ff; box-shadow: 0 0 6px #00a2ff; }
     .gallery-item img, .gallery-item video { width: 100%; height: 100%; object-fit: cover; }
     
     .btn-delete {
       position: absolute; top: 2px; right: 2px; background: #e74c3c;
-      color: white; border: none; font-size: 10px; width: 16px; height: 16px;
+      color: white; border: none; font-size: 9px; width: 15px; height: 15px;
       border-radius: 50%; display: flex; align-items: center; justify-content: center;
-      cursor: pointer; font-weight: bold; line-height: 1; z-index: 5;
+      cursor: pointer; font-weight: bold; z-index: 5;
     }
 
     .upload-btn {
-      background: #1e272e; border: 1px dashed #00a2ff; color: #00a2ff;
-      padding: 10px; border-radius: 6px; text-align: center; cursor: pointer;
-      font-weight: bold; font-size: 12px; display: block; margin-top: 6px;
+      background: #151d28; border: 1px dashed #00a2ff; color: #00a2ff;
+      padding: 8px; border-radius: 6px; text-align: center; cursor: pointer;
+      font-weight: bold; font-size: 12px; display: block; margin-top: 4px;
     }
 
     .btn-record {
-      background: #e74c3c; color: white; border: none; padding: 8px 16px; border-radius: 20px;
-      font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 12px;
+      background: #e74c3c; color: white; border: none; padding: 6px 14px; border-radius: 16px;
+      font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 11px;
     }
     .btn-record.recording { background: #27ae60; animation: pulse 1.5s infinite; }
 
     @keyframes pulse {
       0% { box-shadow: 0 0 0 0 rgba(39, 174, 96, 0.7); }
-      70% { box-shadow: 0 0 0 10px rgba(39, 174, 96, 0); }
+      70% { box-shadow: 0 0 0 8px rgba(39, 174, 96, 0); }
       100% { box-shadow: 0 0 0 0 rgba(39, 174, 96, 0); }
     }
   </style>
 </head>
 <body>
 
-  <!-- Previzualizare Verticala -->
+  <!-- Previzualizare Monitor / Telefon -->
   <div id="preview-container">
     <video id="webcam" playsinline></video>
     <canvas id="output_canvas"></canvas>
 
     <div id="overlay-controls">
       <button id="recordBtn" class="btn-record" onclick="toggleRecording()">
-        <span style="height: 8px; width: 8px; background: white; border-radius: 50%;"></span>
-        <span id="recordText">Inregistrare MP4</span>
+        <span style="height: 7px; width: 7px; background: white; border-radius: 50%;"></span>
+        <span id="recordText">Record MP4</span>
       </button>
-      <button class="btn-action" style="padding: 5px 10px; font-size: 11px;" onclick="toggleFullscreen()">📺 Fullscreen</button>
+      <button class="btn-action" style="padding: 4px 10px; font-size: 11px;" onclick="toggleFullscreen()">📺 Fullscreen</button>
     </div>
   </div>
 
-  <!-- Panou Control Centrat Sub Video -->
+  <!-- Interfața Clasic Refăcută -->
   <div id="main-panel">
 
     <div class="btn-grid">
-      <button id="btnCamera" class="btn-action active" onclick="toggleCameraReal()">Camera Reala: ON</button>
+      <button id="btnCamera" class="btn-action active" onclick="toggleCameraReal()">Camera Reală: ON</button>
+      <button id="btnPose" class="btn-action" onclick="togglePoseLines()">Urmărire Corp: OFF</button>
+    </div>
+
+    <div class="btn-grid">
       <button id="btnFlipH" class="btn-action" onclick="toggleFlipH()">Oglindire (Flip H)</button>
+      <button id="btnFlipV" class="btn-action" onclick="toggleFlipV()">Răsturnare (Flip V)</button>
     </div>
 
     <button class="btn-action btn-green" onclick="toggleFullscreen()">📺 Full Screen (Ecran Complet)</button>
 
-    <!-- GALERIE FUNDAL -->
-    <div class="section-title">🖼️ / 🎥 Fundal Scenă</div>
+    <!-- GALERIE FUNDAL SCENĂ -->
+    <div class="section-title">🖼️ / 🎥 Fundal Scenă (Max 10)</div>
     <label class="upload-btn">
       + Upload Fundal Nou (Foto / Video)
       <input type="file" id="bgUpload" accept="image/*, video/*" multiple style="display:none;">
     </label>
     <div id="bgGallery" class="gallery-grid"></div>
 
-    <!-- GALERIE MASCA -->
-    <div class="section-title">🎭 Avatar / Mască PNG</div>
+    <!-- GALERIE MĂȘTI -->
+    <div class="section-title">🎭 Avatar / Mască PNG (Max 10)</div>
     <label class="upload-btn">
       + Upload Mască Nouă (PNG)
       <input type="file" id="maskUpload" accept="image/png" multiple style="display:none;">
     </label>
     <div id="maskGallery" class="gallery-grid"></div>
 
-    <!-- CALIBRARE SI POZITIE -->
-    <div class="section-title">⚙️️ Calibrare & Pozitie Masca</div>
+    <!-- CALIBRARE MASCĂ -->
+    <div class="section-title">⚙ Calibrare Mască (Zoom / Scale)</div>
     
     <div class="slider-group">
-      <div class="slider-row"><span>Scale Latime / Inaltime:</span><span id="scaleVal">1.0x</span></div>
-      <input type="range" id="maskScale" min="0.1" max="4.0" step="0.05" value="1.0">
+      <div class="slider-row"><span>Scale Lățime (Width):</span><span id="scaleWVal">1.00x</span></div>
+      <input type="range" id="maskScaleW" min="0.1" max="4.0" step="0.02" value="1.0">
     </div>
 
     <div class="slider-group">
-      <div class="slider-row"><span>Offset Pozitie X (Stanga/Dreapta):</span></div>
+      <div class="slider-row"><span>Scale Înălțime (Height):</span><span id="scaleHVal">1.00x</span></div>
+      <input type="range" id="maskScaleH" min="0.1" max="4.0" step="0.02" value="1.0">
+    </div>
+
+    <div class="slider-group">
+      <div class="slider-row"><span>Offset Mască X:</span></div>
       <input type="range" id="maskOffsetX" min="-300" max="300" step="1" value="0">
     </div>
 
     <div class="slider-group">
-      <div class="slider-row"><span>Offset Pozitie Y (Sus/Jos):</span></div>
+      <div class="slider-row"><span>Offset Mască Y:</span></div>
       <input type="range" id="maskOffsetY" min="-300" max="300" step="1" value="0">
     </div>
 
     <div class="slider-group">
-      <div class="slider-row"><span>Rotire Manuala (°):</span></div>
+      <div class="slider-row"><span>Rotire Manuală (°):</span></div>
       <input type="range" id="maskRotate" min="-180" max="180" step="1" value="0">
+    </div>
+
+    <!-- AJUSTARE FINĂ GURĂ / MAPARE BUZE -->
+    <div class="section-title">👄 Ajustare Fină Gură / Lip-Sync</div>
+
+    <div class="slider-group">
+      <div class="slider-row"><span>Fine-Tune Gură X:</span></div>
+      <input type="range" id="mouthOffsetX" min="-50" max="50" step="1" value="0">
+    </div>
+
+    <div class="slider-group">
+      <div class="slider-row"><span>Fine-Tune Gură Y:</span></div>
+      <input type="range" id="mouthOffsetY" min="-50" max="50" step="1" value="0">
+    </div>
+
+    <div class="slider-group">
+      <div class="slider-row"><span>Lățime Gură (Width):</span><span id="mouthWidthVal">1.0x</span></div>
+      <input type="range" id="mouthWidthScale" min="0.5" max="2.5" step="0.05" value="1.0">
+    </div>
+
+    <div class="slider-group">
+      <div class="slider-row"><span>Sensibilitate Deschidere Gură:</span><span id="mouthSensVal">1.0x</span></div>
+      <input type="range" id="mouthSens" min="0.2" max="3.0" step="0.1" value="1.0">
     </div>
 
   </div>
@@ -198,135 +227,154 @@
   let activeMaskImg = null;
   let activeBgMedia = null;
   let showCamera = true;
+  let showPoseLines = false;
   let flipH = false;
+  let flipV = false;
 
-  let maskScale = 1.0;
+  let maskScaleW = 1.0;
+  let maskScaleH = 1.0;
   let maskOffsetX = 0;
   let maskOffsetY = 0;
   let maskRotate = 0;
 
+  let mouthOffsetX = 0;
+  let mouthOffsetY = 0;
+  let mouthWidthScale = 1.0;
+  let mouthSens = 1.0;
+
   let maskList = [];
   let bgList = [];
 
-  // Gesture & Touch Control direct pe ecran
-  let isDragging = false;
-  let startX = 0, startY = 0;
-  let initialPinchDist = null;
+  let currentFaceLandmarks = null;
+  let currentPoseLandmarks = null;
 
   window.addEventListener('load', async () => {
     loadGalleries();
-    await initCamera();
-    initTouchEvents();
+    await initPipelines();
   });
 
-  async function initCamera() {
+  async function initPipelines() {
+    const faceMesh = new FaceMesh({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}` });
+    faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5 });
+    faceMesh.onResults((res) => {
+      currentFaceLandmarks = (res.multiFaceLandmarks && res.multiFaceLandmarks.length > 0) ? res.multiFaceLandmarks[0] : null;
+    });
+
+    const pose = new Pose({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` });
+    pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.5 });
+    pose.onResults((res) => {
+      currentPoseLandmarks = res.poseLandmarks || null;
+      renderAll();
+    });
+
     const camera = new Camera(videoElement, {
       onFrame: async () => {
         await faceMesh.send({ image: videoElement });
+        await pose.send({ image: videoElement });
       },
       width: 1280, height: 720
     });
     camera.start();
   }
 
-  // Mediapipe FaceMesh Setup
-  const faceMesh = new FaceMesh({
-    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
-  });
-  faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5 });
-  
-  faceMesh.onResults((results) => {
-    renderScene(results);
-  });
-
-  // Render Loop
-  function renderScene(results) {
+  function renderAll() {
     canvasElement.width = previewContainer.clientWidth || 720;
     canvasElement.height = previewContainer.clientHeight || 1280;
 
     canvasCtx.save();
     canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
 
-    if (flipH) {
-      canvasCtx.translate(canvasElement.width, 0);
-      canvasCtx.scale(-1, 1);
-    }
+    // Transformari Oglindire / Rasturnare
+    canvasCtx.translate(flipH ? canvasElement.width : 0, flipV ? canvasElement.height : 0);
+    canvasCtx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
 
     // 1. Deseneaza Fundalul
     if (activeBgMedia) {
       canvasCtx.drawImage(activeBgMedia, 0, 0, canvasElement.width, canvasElement.height);
     }
 
-    // 2. Deseneaza Corpul Reala (Video Stream)
-    if (showCamera && results.image) {
-      canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+    // 2. Deseneaza Corpul Real (Webcam Stream)
+    if (showCamera) {
+      canvasCtx.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
     }
 
-    // 3. Deseneaza Masca pe Fata
-    if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
-      drawMask(results.multiFaceLandmarks[0]);
+    // 3. Deseneaza Liniile/Punctele Verzi de Corp (Pose Tracking 3D)
+    if (showPoseLines && currentPoseLandmarks) {
+      drawConnectors(canvasCtx, currentPoseLandmarks, POSE_CONNECTIONS, { color: '#00FF00', lineWidth: 3 });
+      drawLandmarks(canvasCtx, currentPoseLandmarks, { color: '#FF0000', lineWidth: 1, radius: 3 });
+    }
+
+    // 4. Deseneaza Masca si Maparea pe Buze
+    if (currentFaceLandmarks) {
+      drawMaskAndLips(currentFaceLandmarks);
     }
 
     canvasCtx.restore();
   }
 
-  function drawMask(landmarks) {
+  function drawMaskAndLips(landmarks) {
     if (!activeMaskImg) return;
 
     const top = landmarks[10], bottom = landmarks[152], left = landmarks[234], right = landmarks[454];
     const cx = (((left.x + right.x) / 2) * canvasElement.width) + maskOffsetX;
     const cy = (((top.y + bottom.y) / 2) * canvasElement.height) + maskOffsetY;
 
-    const width = Math.hypot((right.x - left.x) * canvasElement.width, (right.y - left.y) * canvasElement.height) * 2.2 * maskScale;
-    const height = width * (activeMaskImg.height / activeMaskImg.width);
+    const baseWidth = Math.hypot((right.x - left.x) * canvasElement.width, (right.y - left.y) * canvasElement.height) * 2.2;
+    const width = baseWidth * maskScaleW;
+    const height = (baseWidth * (activeMaskImg.height / activeMaskImg.width)) * maskScaleH;
+
     const autoAngle = Math.atan2((right.y - left.y) * canvasElement.height, (right.x - left.x) * canvasElement.width);
     const totalAngle = autoAngle + (maskRotate * Math.PI / 180);
 
+    // Baza Măștii
     canvasCtx.save();
     canvasCtx.translate(cx, cy);
     canvasCtx.rotate(totalAngle);
     canvasCtx.drawImage(activeMaskImg, -width / 2, -height / 2, width, height);
+
+    // Mapare Fină Deschidere Gură (Lip Sync Dynamic Crop)
+    const upperLip = landmarks[13], lowerLip = landmarks[14];
+    const lipDist = Math.hypot((upperLip.x - lowerLip.x) * canvasElement.width, (upperLip.y - lowerLip.y) * canvasElement.height);
+    const mouthOpenRatio = Math.min(Math.max((lipDist - 2) * 0.15 * mouthSens, 0), 1.5);
+
+    if (mouthOpenRatio > 0.05) {
+      const mouthX = (cx - width / 2) + (width * 0.35) + mouthOffsetX;
+      const mouthY = (cy - height / 2) + (height * 0.60) + mouthOffsetY;
+      const mouthW = (width * 0.30) * mouthWidthScale;
+      const mouthH = (height * 0.18) * mouthOpenRatio;
+
+      canvasCtx.fillStyle = '#000000';
+      canvasCtx.beginPath();
+      canvasCtx.ellipse(mouthX + mouthW / 2, mouthY + mouthH / 2, mouthW / 2, mouthH / 2, 0, 0, Math.PI * 2);
+      canvasCtx.fill();
+    }
+
     canvasCtx.restore();
   }
 
-  // Touch & Mouse Control Direct Pe Masca
-  function initTouchEvents() {
-    canvasElement.addEventListener('mousedown', (e) => {
-      isDragging = true;
-      startX = e.clientX - maskOffsetX;
-      startY = e.clientY - maskOffsetY;
-    });
-
-    window.addEventListener('mousemove', (e) => {
-      if (!isDragging) return;
-      maskOffsetX = e.clientX - startX;
-      maskOffsetY = e.clientY - startY;
-      document.getElementById('maskOffsetX').value = maskOffsetX;
-      document.getElementById('maskOffsetY').value = maskOffsetY;
-    });
-
-    window.addEventListener('mouseup', () => { isDragging = false; });
-
-    canvasElement.addEventListener('wheel', (e) => {
-      e.preventDefault();
-      maskScale += e.deltaY * -0.001;
-      maskScale = Math.min(Math.max(0.1, maskScale), 4.0);
-      document.getElementById('maskScale').value = maskScale;
-      document.getElementById('scaleVal').innerText = maskScale.toFixed(2) + 'x';
-    }, { passive: false });
-  }
-
-  // UI Handlers & Toggles
+  // Comutatoare Butoane
   function toggleCameraReal() {
     showCamera = !showCamera;
-    const btn = document.getElementById('btnCamera');
-    btn.innerText = `Camera Reala: ${showCamera ? 'ON' : 'OFF'}`;
-    btn.classList.toggle('active', showCamera);
+    const b = document.getElementById('btnCamera');
+    b.innerText = `Camera Reală: ${showCamera ? 'ON' : 'OFF'}`;
+    b.classList.toggle('active', showCamera);
+  }
+
+  function togglePoseLines() {
+    showPoseLines = !showPoseLines;
+    const b = document.getElementById('btnPose');
+    b.innerText = `Urmărire Corp: ${showPoseLines ? 'ON' : 'OFF'}`;
+    b.classList.toggle('active', showPoseLines);
   }
 
   function toggleFlipH() {
     flipH = !flipH;
     document.getElementById('btnFlipH').classList.toggle('active', flipH);
+  }
+
+  function toggleFlipV() {
+    flipV = !flipV;
+    document.getElementById('btnFlipV').classList.toggle('active', flipV);
   }
 
   function toggleFullscreen() {
@@ -338,38 +386,45 @@
     }
   }
 
-  // Event Sliders
-  document.getElementById('maskScale').addEventListener('input', (e) => {
-    maskScale = parseFloat(e.target.value);
-    document.getElementById('scaleVal').innerText = maskScale.toFixed(2) + 'x';
+  // Listeners Sliders
+  document.getElementById('maskScaleW').addEventListener('input', (e) => {
+    maskScaleW = parseFloat(e.target.value);
+    document.getElementById('scaleWVal').innerText = maskScaleW.toFixed(2) + 'x';
+  });
+  document.getElementById('maskScaleH').addEventListener('input', (e) => {
+    maskScaleH = parseFloat(e.target.value);
+    document.getElementById('scaleHVal').innerText = maskScaleH.toFixed(2) + 'x';
   });
   document.getElementById('maskOffsetX').addEventListener('input', (e) => maskOffsetX = parseInt(e.target.value));
   document.getElementById('maskOffsetY').addEventListener('input', (e) => maskOffsetY = parseInt(e.target.value));
   document.getElementById('maskRotate').addEventListener('input', (e) => maskRotate = parseInt(e.target.value));
 
-  // Galerie Masti PNG
+  document.getElementById('mouthOffsetX').addEventListener('input', (e) => mouthOffsetX = parseInt(e.target.value));
+  document.getElementById('mouthOffsetY').addEventListener('input', (e) => mouthOffsetY = parseInt(e.target.value));
+  document.getElementById('mouthWidthScale').addEventListener('input', (e) => {
+    mouthWidthScale = parseFloat(e.target.value);
+    document.getElementById('mouthWidthVal').innerText = mouthWidthScale.toFixed(2) + 'x';
+  });
+  document.getElementById('mouthSens').addEventListener('input', (e) => {
+    mouthSens = parseFloat(e.target.value);
+    document.getElementById('mouthSensVal').innerText = mouthSens.toFixed(1) + 'x';
+  });
+
+  // Salvare & Galerie
   document.getElementById('maskUpload').addEventListener('change', (e) => {
-    const files = Array.from(e.target.files);
-    files.forEach(file => {
+    Array.from(e.target.files).forEach(file => {
       const reader = new FileReader();
-      reader.onload = (event) => {
-        maskList.push(event.target.result);
-        saveGalleries();
-        renderMaskGallery();
-      };
+      reader.onload = (ev) => { maskList.push(ev.target.result); saveGalleries(); renderMaskGallery(); };
       reader.readAsDataURL(file);
     });
   });
 
-  // Galerie Fundal
   document.getElementById('bgUpload').addEventListener('change', (e) => {
-    const files = Array.from(e.target.files);
-    files.forEach(file => {
+    Array.from(e.target.files).forEach(file => {
       const reader = new FileReader();
-      reader.onload = (event) => {
-        bgList.push({ src: event.target.result, type: file.type.startsWith('video/') ? 'video' : 'image' });
-        saveGalleries();
-        renderBgGallery();
+      reader.onload = (ev) => {
+        bgList.push({ src: ev.target.result, type: file.type.startsWith('video/') ? 'video' : 'image' });
+        saveGalleries(); renderBgGallery();
       };
       reader.readAsDataURL(file);
     });
@@ -386,8 +441,7 @@
         document.querySelectorAll('#maskGallery .gallery-item').forEach(el => el.classList.remove('active'));
         div.classList.add('active');
         const img = new Image();
-        img.src = src;
-        img.onload = () => { activeMaskImg = img; };
+        img.src = src; img.onload = () => { activeMaskImg = img; };
       };
       container.appendChild(div);
     });
@@ -412,8 +466,7 @@
           activeBgMedia = v;
         } else {
           const img = new Image();
-          img.src = item.src;
-          img.onload = () => { activeBgMedia = img; };
+          img.src = item.src; img.onload = () => { activeBgMedia = img; };
         }
       };
       container.appendChild(div);
@@ -424,30 +477,28 @@
     e.stopPropagation();
     maskList.splice(idx, 1);
     if (maskList.length === 0) activeMaskImg = null;
-    saveGalleries();
-    renderMaskGallery();
+    saveGalleries(); renderMaskGallery();
   }
 
   function deleteBg(idx, e) {
     e.stopPropagation();
     bgList.splice(idx, 1);
     if (bgList.length === 0) activeBgMedia = null;
-    saveGalleries();
-    renderBgGallery();
+    saveGalleries(); renderBgGallery();
   }
 
   function saveGalleries() {
     try {
       localStorage.setItem('vt_masks', JSON.stringify(maskList));
       localStorage.setItem('vt_bgs', JSON.stringify(bgList));
-    } catch (e) {}
+    } catch (err) {}
   }
 
   function loadGalleries() {
-    const savedMasks = localStorage.getItem('vt_masks');
-    const savedBgs = localStorage.getItem('vt_bgs');
-    if (savedMasks) { maskList = JSON.parse(savedMasks); renderMaskGallery(); }
-    if (savedBgs) { bgList = JSON.parse(savedBgs); renderBgGallery(); }
+    const m = localStorage.getItem('vt_masks');
+    const b = localStorage.getItem('vt_bgs');
+    if (m) { maskList = JSON.parse(m); renderMaskGallery(); }
+    if (b) { bgList = JSON.parse(b); renderBgGallery(); }
   }
 
   // Inregistrare MP4
@@ -471,7 +522,7 @@
     mediaRecorder.start();
     isRecording = true;
     document.getElementById('recordBtn').classList.add('recording');
-    document.getElementById('recordText').innerText = "Stop & Salveaza";
+    document.getElementById('recordText').innerText = "Stop & Salvează";
   }
 
   function stopRecording() {
@@ -479,7 +530,7 @@
       mediaRecorder.stop();
       isRecording = false;
       document.getElementById('recordBtn').classList.remove('recording');
-      document.getElementById('recordText').innerText = "Inregistrare MP4";
+      document.getElementById('recordText').innerText = "Record MP4";
     }
   }
 
@@ -488,7 +539,7 @@
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `VTuber_Event_${Date.now()}.mp4`;
+    a.download = `VTuber_Record_${Date.now()}.mp4`;
     document.body.appendChild(a);
     a.click();
     setTimeout(() => { document.body.removeChild(a); window.URL.revokeObjectURL(url); }, 100);
