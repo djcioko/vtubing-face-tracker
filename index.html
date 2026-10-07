@@ -138,7 +138,11 @@
     </div>
 
     <div class="upload-group">
-      <label>Calibrare Manuală Cap & Brațe</label>
+      <label>Calibrare Manuală Cap & Torso</label>
+      <div class="scale-controls">
+        <span>Lungime Torso:</span>
+        <input type="range" id="scale-torso-len" min="0.3" max="1.2" step="0.05" value="0.75">
+      </div>
       <div class="scale-controls">
         <span>Scală Cap:</span>
         <input type="range" id="scale-head" min="0.3" max="4.0" step="0.05" value="1.0">
@@ -201,6 +205,7 @@
   const input3D = document.getElementById('file-3d');
   const bgFileUpload = document.getElementById('bg-file-upload');
 
+  const sliderTorsoLen = document.getElementById('scale-torso-len');
   const sliderHead = document.getElementById('scale-head');
   const sliderArms = document.getElementById('scale-arms');
   const slider3DScale = document.getElementById('scale-3d');
@@ -237,4 +242,424 @@
     armRight: { type: null, element: null }
   };
 
-  let model3D
+  let draggingPointIndex = -1;
+  let isDraggingHead = false;
+  let dragStartMouse = { x: 0, y: 0 };
+  let currentTorsoPoints = [];
+  let currentHeadCenter = null;
+
+  function updateToggleUI(btn, state, textPrefix) {
+    btn.classList.toggle('active', state);
+    btn.innerText = `${textPrefix}: ${state ? 'ON' : 'OFF'}`;
+  }
+
+  updateToggleUI(toggleSkeletonBtn, showSkeleton, 'Linii Grid');
+  updateToggleUI(toggleCropBtn, enableCrop, 'Crop AI');
+  toggleHideCamBtn.innerText = `Camera: ${hideCamera ? 'HIDE' : 'SHOW'}`;
+  toggleHideCamBtn.classList.toggle('active', !hideCamera);
+
+  updateToggleUI(tog3DBtn, show3D, 'Model 3D');
+  updateToggleUI(togHeadBtn, partVis.head, 'Cap');
+  updateToggleUI(togTorsoBtn, partVis.torso, 'Torso Mesh');
+  updateToggleUI(togArmLeftBtn, partVis.armLeft, 'Braț L');
+  updateToggleUI(togArmRightBtn, partVis.armRight, 'Braț R');
+  updateToggleUI(togBgBtn, showBg, 'Fundal');
+
+  toggleSkeletonBtn.addEventListener('click', () => {
+    showSkeleton = !showSkeleton;
+    localStorage.setItem('app_showSkeleton', showSkeleton);
+    updateToggleUI(toggleSkeletonBtn, showSkeleton, 'Linii Grid');
+  });
+
+  toggleCropBtn.addEventListener('click', () => {
+    enableCrop = !enableCrop;
+    localStorage.setItem('app_crop', enableCrop);
+    updateToggleUI(toggleCropBtn, enableCrop, 'Crop AI');
+  });
+
+  toggleHideCamBtn.addEventListener('click', () => {
+    hideCamera = !hideCamera;
+    localStorage.setItem('app_hide_camera', hideCamera);
+    toggleHideCamBtn.innerText = `Camera: ${hideCamera ? 'HIDE' : 'SHOW'}`;
+    toggleHideCamBtn.classList.toggle('active', !hideCamera);
+  });
+
+  tog3DBtn.addEventListener('click', () => {
+    show3D = !show3D;
+    localStorage.setItem('app_vis_3d', show3D);
+    updateToggleUI(tog3DBtn, show3D, 'Model 3D');
+  });
+
+  togHeadBtn.addEventListener('click', () => {
+    partVis.head = !partVis.head;
+    localStorage.setItem('app_vis_head', partVis.head);
+    updateToggleUI(togHeadBtn, partVis.head, 'Cap');
+  });
+
+  togTorsoBtn.addEventListener('click', () => {
+    partVis.torso = !partVis.torso;
+    localStorage.setItem('app_vis_torso', partVis.torso);
+    updateToggleUI(togTorsoBtn, partVis.torso, 'Torso Mesh');
+  });
+
+  togArmLeftBtn.addEventListener('click', () => {
+    partVis.armLeft = !partVis.armLeft;
+    localStorage.setItem('app_vis_armLeft', partVis.armLeft);
+    updateToggleUI(togArmLeftBtn, partVis.armLeft, 'Braț L');
+  });
+
+  togArmRightBtn.addEventListener('click', () => {
+    partVis.armRight = !partVis.armRight;
+    localStorage.setItem('app_vis_armRight', partVis.armRight);
+    updateToggleUI(togArmRightBtn, partVis.armRight, 'Braț R');
+  });
+
+  togBgBtn.addEventListener('click', () => {
+    showBg = !showBg;
+    localStorage.setItem('app_vis_bg', showBg);
+    updateToggleUI(togBgBtn, showBg, 'Fundal');
+  });
+
+  resetBtn.addEventListener('click', () => {
+    torsoGridOffsets = Array(8).fill().map(() => ({x: 0, y: 0}));
+    headOffset = { x: 0, y: 0 };
+    localStorage.setItem('app_torso_grid_offsets', JSON.stringify(torsoGridOffsets));
+    localStorage.setItem('app_head_drag_offset', JSON.stringify(headOffset));
+  });
+
+  function handleGenericFileUpload(file, key) {
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    if (file.type.startsWith('video/')) {
+      const v = document.createElement('video');
+      v.src = url;
+      v.autoplay = true; v.loop = true; v.muted = true; v.playsInline = true;
+      v.play();
+      segmentAssets[key] = { type: 'video', element: v };
+    } else {
+      const img = new Image();
+      img.src = url;
+      segmentAssets[key] = { type: 'image', element: img };
+    }
+  }
+
+  inputHead.addEventListener('change', (e) => handleGenericFileUpload(e.target.files[0], 'head'));
+  inputTorso.addEventListener('change', (e) => handleGenericFileUpload(e.target.files[0], 'torso'));
+  inputArmLeft.addEventListener('change', (e) => handleGenericFileUpload(e.target.files[0], 'armLeft'));
+  inputArmRight.addEventListener('change', (e) => handleGenericFileUpload(e.target.files[0], 'armRight'));
+
+  bgFileUpload.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    if (file.type.startsWith('video/')) {
+      bgType = 'video';
+      bgVideoElement.src = url;
+      bgVideoElement.play();
+    } else {
+      bgType = 'image';
+      customBgImg = new Image();
+      customBgImg.src = url;
+    }
+  });
+
+  function drawTriangleSubTexture(ctx, media, p0, p1, p2, u0, v0, u1, v1, u2, v2) {
+    const w = media.videoWidth || media.width || 1;
+    const h = media.videoHeight || media.height || 1;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(p0.x, p0.y);
+    ctx.lineTo(p1.x, p1.y);
+    ctx.lineTo(p2.x, p2.y);
+    ctx.closePath();
+    ctx.clip();
+
+    const x0 = p0.x, y0 = p0.y;
+    const x1 = p1.x, y1 = p1.y;
+    const x2 = p2.x, y2 = p2.y;
+
+    const sx0 = u0 * w, sy0 = v0 * h;
+    const sx1 = u1 * w, sy1 = v1 * h;
+    const sx2 = u2 * w, sy2 = v2 * h;
+
+    const denom = (sx0 * (sy1 - sy2) + sx1 * (sy2 - sy0) + sx2 * (sy0 - sy1));
+    if (Math.abs(denom) < 1e-5) {
+      ctx.restore();
+      return;
+    }
+
+    const a = (x0 * (sy1 - sy2) + x1 * (sy2 - sy0) + x2 * (sy0 - sy1)) / denom;
+    const c = (x0 * (sx2 - sx1) + x1 * (sx0 - sx2) + x2 * (sx1 - sx0)) / denom;
+    const e = (x0 * (sx1 * sy2 - sx2 * sy1) + x1 * (sx2 * sy0 - sx0 * sy2) + x2 * (sx0 * sy1 - sx1 * sy0)) / denom;
+
+    const b = (y0 * (sy1 - sy2) + y1 * (sy2 - sy0) + y2 * (sy0 - sy1)) / denom;
+    const d = (y0 * (sx2 - sx1) + y1 * (sx0 - sx2) + y2 * (sx1 - sx0)) / denom;
+    const f = (y0 * (sx1 * sy2 - sx2 * sy1) + y1 * (sx2 * sy0 - sx0 * sy2) + y2 * (sx0 * sy1 - sx1 * sy0)) / denom;
+
+    ctx.transform(a, b, c, d, e, f);
+    ctx.drawImage(media, 0, 0, w, h);
+    ctx.restore();
+  }
+
+  function drawFullWarpedTorso(ctx, asset, points) {
+    if (!asset || !asset.element || points.length < 8) return;
+    const elem = asset.element;
+
+    const grid = [
+      [points[0], points[1]],
+      [points[2], points[3]],
+      [points[4], points[5]],
+      [points[6], points[7]]
+    ];
+
+    for (let r = 0; r < 3; r++) {
+      const v0 = r / 3;
+      const v1 = (r + 1) / 3;
+
+      const pTL = grid[r][0];
+      const pTR = grid[r][1];
+      const pBL = grid[r + 1][0];
+      const pBR = grid[r + 1][1];
+
+      drawTriangleSubTexture(ctx, elem, pTL, pTR, pBL, 0, v0, 1, v0, 0, v1);
+      drawTriangleSubTexture(ctx, elem, pTR, pBR, pBL, 1, v0, 1, v1, 0, v1);
+    }
+  }
+
+  function getCanvasCoords(e) {
+    const rect = canvasElement.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    
+    const xRaw = clientX - rect.left;
+    const y = clientY - rect.top;
+    const x = rect.width - xRaw; 
+    return { x, y };
+  }
+
+  function handleStart(e) {
+    const pos = getCanvasCoords(e);
+    
+    if (currentTorsoPoints.length === 8) {
+      for (let i = 0; i < currentTorsoPoints.length; i++) {
+        const pt = currentTorsoPoints[i];
+        const dist = Math.hypot(pt.x - pos.x, pt.y - pos.y);
+        if (dist < 18) {
+          draggingPointIndex = i;
+          return;
+        }
+      }
+    }
+
+    if (currentHeadCenter) {
+      const distHead = Math.hypot(currentHeadCenter.x - pos.x, currentHeadCenter.y - pos.y);
+      if (distHead < currentHeadCenter.radius) {
+        isDraggingHead = true;
+        dragStartMouse = { x: pos.x, y: pos.y };
+      }
+    }
+  }
+
+  function handleMove(e) {
+    if (draggingPointIndex !== -1) {
+      const pos = getCanvasCoords(e);
+      torsoGridOffsets[draggingPointIndex].x += pos.x - (currentTorsoPoints[draggingPointIndex].x);
+      torsoGridOffsets[draggingPointIndex].y += pos.y - (currentTorsoPoints[draggingPointIndex].y);
+      localStorage.setItem('app_torso_grid_offsets', JSON.stringify(torsoGridOffsets));
+    } else if (isDraggingHead) {
+      const pos = getCanvasCoords(e);
+      const dx = pos.x - dragStartMouse.x;
+      const dy = pos.y - dragStartMouse.y;
+      headOffset.x += dx;
+      headOffset.y += dy;
+      dragStartMouse = pos;
+      localStorage.setItem('app_head_drag_offset', JSON.stringify(headOffset));
+    }
+  }
+
+  function handleEnd() {
+    draggingPointIndex = -1;
+    isDraggingHead = false;
+  }
+
+  canvasElement.addEventListener('mousedown', handleStart);
+  canvasElement.addEventListener('mousemove', handleMove);
+  window.addEventListener('mouseup', handleEnd);
+
+  canvasElement.addEventListener('touchstart', handleStart);
+  canvasElement.addEventListener('touchmove', handleMove);
+  window.addEventListener('touchend', handleEnd);
+
+  function onResults(results) {
+    canvasCtx.save();
+    canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+
+    if (showBg) {
+      if (bgType === 'video' && bgVideoElement.readyState >= 2) {
+        canvasCtx.drawImage(bgVideoElement, 0, 0, canvasElement.width, canvasElement.height);
+      } else if (bgType === 'image' && customBgImg && customBgImg.complete) {
+        canvasCtx.drawImage(customBgImg, 0, 0, canvasElement.width, canvasElement.height);
+      }
+    }
+
+    if (!hideCamera && results.image) {
+      canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+    }
+
+    if (results.poseLandmarks) {
+      const lm = results.poseLandmarks;
+      const w = canvasElement.width;
+      const h = canvasElement.height;
+
+      const lShoulder = { x: lm[11].x * w, y: lm[11].y * h };
+      const rShoulder = { x: lm[12].x * w, y: lm[12].y * h };
+      
+      // Aplicam factorul de scalare/micsorare pentru lungimea torso-ului
+      const torsoScaleFactor = parseFloat(sliderTorsoLen.value);
+
+      const lHipRaw = { x: lm[23].x * w, y: lm[23].y * h };
+      const rHipRaw = { x: lm[24].x * w, y: lm[24].y * h };
+
+      // Re-calculam punctele inferioare mai aproape de umeri
+      const lHip = {
+        x: lShoulder.x + (lHipRaw.x - lShoulder.x) * torsoScaleFactor,
+        y: lShoulder.y + (lHipRaw.y - lShoulder.y) * torsoScaleFactor
+      };
+      const rHip = {
+        x: rShoulder.x + (rHipRaw.x - rShoulder.x) * torsoScaleFactor,
+        y: rShoulder.y + (rHipRaw.y - rShoulder.y) * torsoScaleFactor
+      };
+
+      const gridBase = [
+        { x: lShoulder.x, y: lShoulder.y },
+        { x: rShoulder.x, y: rShoulder.y },
+        
+        { x: lShoulder.x * 0.66 + lHip.x * 0.34, y: lShoulder.y * 0.66 + lHip.y * 0.34 },
+        { x: rShoulder.x * 0.66 + rHip.x * 0.34, y: rShoulder.y * 0.66 + rHip.y * 0.34 },
+        
+        { x: lShoulder.x * 0.34 + lHip.x * 0.66, y: lShoulder.y * 0.34 + lHip.y * 0.66 },
+        { x: rShoulder.x * 0.34 + rHip.x * 0.66, y: rShoulder.y * 0.34 + rHip.y * 0.66 },
+
+        { x: lHip.x, y: lHip.y },
+        { x: rHip.x, y: rHip.y }
+      ];
+
+      currentTorsoPoints = gridBase.map((pt, idx) => ({
+        x: pt.x + torsoGridOffsets[idx].x,
+        y: pt.y + torsoGridOffsets[idx].y
+      }));
+
+      if (partVis.torso) {
+        drawFullWarpedTorso(canvasCtx, segmentAssets.torso, currentTorsoPoints);
+      }
+
+      if (results.faceLandmarks && partVis.head) {
+        const flm = results.faceLandmarks;
+        const nose = { x: flm[1].x * w, y: flm[1].y * h };
+        const topHead = { x: flm[10].x * w, y: flm[10].y * h };
+        const chin = { x: flm[152].x * w, y: flm[152].y * h };
+
+        const headRadius = Math.hypot(topHead.x - chin.x, topHead.y - chin.y) * parseFloat(sliderHead.value);
+        const centerHead = {
+          x: nose.x + headOffset.x,
+          y: nose.y + headOffset.y,
+          radius: headRadius
+        };
+        currentHeadCenter = centerHead;
+
+        if (segmentAssets.head.element) {
+          canvasCtx.save();
+          canvasCtx.beginPath();
+          canvasCtx.arc(centerHead.x, centerHead.y, headRadius, 0, Math.PI * 2);
+          canvasCtx.clip();
+          canvasCtx.drawImage(
+            segmentAssets.head.element,
+            centerHead.x - headRadius,
+            centerHead.y - headRadius,
+            headRadius * 2,
+            headRadius * 2
+          );
+          canvasCtx.restore();
+        }
+      }
+
+      if (showSkeleton) {
+        canvasCtx.strokeStyle = '#00ffcc';
+        canvasCtx.lineWidth = 1.5;
+        
+        for (let i = 0; i < 3; i++) {
+          const pTL = currentTorsoPoints[i * 2];
+          const pTR = currentTorsoPoints[i * 2 + 1];
+          const pBL = currentTorsoPoints[(i + 1) * 2];
+          const pBR = currentTorsoPoints[(i + 1) * 2 + 1];
+
+          canvasCtx.beginPath();
+          canvasCtx.moveTo(pTL.x, pTL.y);
+          canvasCtx.lineTo(pTR.x, pTR.y);
+          canvasCtx.lineTo(pBR.x, pBR.y);
+          canvasCtx.lineTo(pBL.x, pBL.y);
+          canvasCtx.closePath();
+          canvasCtx.stroke();
+        }
+
+        currentTorsoPoints.forEach(pt => {
+          canvasCtx.fillStyle = '#ffffff';
+          canvasCtx.beginPath();
+          canvasCtx.arc(pt.x, pt.y, 6, 0, Math.PI * 2);
+          canvasCtx.fill();
+          canvasCtx.strokeStyle = '#00ffcc';
+          canvasCtx.stroke();
+        });
+
+        if (currentHeadCenter) {
+          canvasCtx.strokeStyle = '#00ffff';
+          canvasCtx.beginPath();
+          canvasCtx.arc(currentHeadCenter.x, currentHeadCenter.y, currentHeadCenter.radius, 0, Math.PI * 2);
+          canvasCtx.stroke();
+          canvasCtx.fillStyle = '#00ffff';
+          canvasCtx.beginPath();
+          canvasCtx.arc(currentHeadCenter.x, currentHeadCenter.y, 4, 0, Math.PI * 2);
+          canvasCtx.fill();
+        }
+      }
+    }
+
+    canvasCtx.restore();
+  }
+
+  let camera = null;
+  const holistic = new Holistic({
+    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/holistic/${file}`
+  });
+
+  holistic.setOptions({
+    modelComplexity: 1,
+    smoothLandmarks: true,
+    enableSegmentation: false,
+    refineFaceLandmarks: true
+  });
+
+  holistic.onResults(onResults);
+
+  startBtn.addEventListener('click', () => {
+    startBtn.disabled = true;
+    statusDiv.innerText = "Se inițializează camera & AI...";
+
+    camera = new Camera(videoElement, {
+      onFrame: async () => {
+        canvasElement.width = videoElement.videoWidth || window.innerWidth;
+        canvasElement.height = videoElement.videoHeight || window.innerHeight;
+        await holistic.send({ image: videoElement });
+      },
+      width: 1280,
+      height: 720
+    });
+
+    camera.start().then(() => {
+      statusDiv.innerText = "Sistem activ. Mărește/Trage punctele de pe ecran!";
+    });
+  });
+</script>
+</body>
+</html>
