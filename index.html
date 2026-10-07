@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>2D & 3D Rigging - Free Mesh Torso & Interactive Head</title>
+  <title>2D & 3D Rigging - Compact 4-Point Torso</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body {
@@ -141,7 +141,7 @@
       <label>Calibrare Manuală Cap & Torso</label>
       <div class="scale-controls">
         <span>Lungime Torso:</span>
-        <input type="range" id="scale-torso-len" min="0.3" max="1.2" step="0.05" value="0.75">
+        <input type="range" id="scale-torso-len" min="0.1" max="1.0" step="0.02" value="0.4">
       </div>
       <div class="scale-controls">
         <span>Scală Cap:</span>
@@ -225,8 +225,8 @@
     armRight: localStorage.getItem('app_vis_armRight') !== 'false'
   };
 
-  let torsoGridOffsets = JSON.parse(localStorage.getItem('app_torso_grid_offsets')) || [
-    {x:0, y:0}, {x:0, y:0}, {x:0, y:0}, {x:0, y:0},
+  // Doar 4 puncte de control pentru cele 4 colțuri
+  let torsoGridOffsets = JSON.parse(localStorage.getItem('app_torso_grid_offsets_4pts')) || [
     {x:0, y:0}, {x:0, y:0}, {x:0, y:0}, {x:0, y:0}
   ];
 
@@ -321,9 +321,9 @@
   });
 
   resetBtn.addEventListener('click', () => {
-    torsoGridOffsets = Array(8).fill().map(() => ({x: 0, y: 0}));
+    torsoGridOffsets = Array(4).fill().map(() => ({x: 0, y: 0}));
     headOffset = { x: 0, y: 0 };
-    localStorage.setItem('app_torso_grid_offsets', JSON.stringify(torsoGridOffsets));
+    localStorage.setItem('app_torso_grid_offsets_4pts', JSON.stringify(torsoGridOffsets));
     localStorage.setItem('app_head_drag_offset', JSON.stringify(headOffset));
   });
 
@@ -403,28 +403,17 @@
   }
 
   function drawFullWarpedTorso(ctx, asset, points) {
-    if (!asset || !asset.element || points.length < 8) return;
+    if (!asset || !asset.element || points.length < 4) return;
     const elem = asset.element;
 
-    const grid = [
-      [points[0], points[1]],
-      [points[2], points[3]],
-      [points[4], points[5]],
-      [points[6], points[7]]
-    ];
+    const pTL = points[0]; // Umăr Stânga
+    const pTR = points[1]; // Umăr Drept
+    const pBL = points[2]; // Șold Stânga
+    const pBR = points[3]; // Șold Drept
 
-    for (let r = 0; r < 3; r++) {
-      const v0 = r / 3;
-      const v1 = (r + 1) / 3;
-
-      const pTL = grid[r][0];
-      const pTR = grid[r][1];
-      const pBL = grid[r + 1][0];
-      const pBR = grid[r + 1][1];
-
-      drawTriangleSubTexture(ctx, elem, pTL, pTR, pBL, 0, v0, 1, v0, 0, v1);
-      drawTriangleSubTexture(ctx, elem, pTR, pBR, pBL, 1, v0, 1, v1, 0, v1);
-    }
+    // Randăm cele 2 triunghiuri ce formează patrulaterul
+    drawTriangleSubTexture(ctx, elem, pTL, pTR, pBL, 0, 0, 1, 0, 0, 1);
+    drawTriangleSubTexture(ctx, elem, pTR, pBR, pBL, 1, 0, 1, 1, 0, 1);
   }
 
   function getCanvasCoords(e) {
@@ -441,11 +430,11 @@
   function handleStart(e) {
     const pos = getCanvasCoords(e);
     
-    if (currentTorsoPoints.length === 8) {
+    if (currentTorsoPoints.length === 4) {
       for (let i = 0; i < currentTorsoPoints.length; i++) {
         const pt = currentTorsoPoints[i];
         const dist = Math.hypot(pt.x - pos.x, pt.y - pos.y);
-        if (dist < 18) {
+        if (dist < 20) {
           draggingPointIndex = i;
           return;
         }
@@ -466,7 +455,7 @@
       const pos = getCanvasCoords(e);
       torsoGridOffsets[draggingPointIndex].x += pos.x - (currentTorsoPoints[draggingPointIndex].x);
       torsoGridOffsets[draggingPointIndex].y += pos.y - (currentTorsoPoints[draggingPointIndex].y);
-      localStorage.setItem('app_torso_grid_offsets', JSON.stringify(torsoGridOffsets));
+      localStorage.setItem('app_torso_grid_offsets_4pts', JSON.stringify(torsoGridOffsets));
     } else if (isDraggingHead) {
       const pos = getCanvasCoords(e);
       const dx = pos.x - dragStartMouse.x;
@@ -515,13 +504,13 @@
       const lShoulder = { x: lm[11].x * w, y: lm[11].y * h };
       const rShoulder = { x: lm[12].x * w, y: lm[12].y * h };
       
-      // Aplicam factorul de scalare/micsorare pentru lungimea torso-ului
+      // Factor mic pentru lungime torso (default 0.4 pentru cadru scurt)
       const torsoScaleFactor = parseFloat(sliderTorsoLen.value);
 
       const lHipRaw = { x: lm[23].x * w, y: lm[23].y * h };
       const rHipRaw = { x: lm[24].x * w, y: lm[24].y * h };
 
-      // Re-calculam punctele inferioare mai aproape de umeri
+      // Calculăm punctele de jos (șolduri) mult mai aproape de umeri
       const lHip = {
         x: lShoulder.x + (lHipRaw.x - lShoulder.x) * torsoScaleFactor,
         y: lShoulder.y + (lHipRaw.y - lShoulder.y) * torsoScaleFactor
@@ -531,16 +520,10 @@
         y: rShoulder.y + (rHipRaw.y - rShoulder.y) * torsoScaleFactor
       };
 
+      // Doar 4 puncte colț
       const gridBase = [
         { x: lShoulder.x, y: lShoulder.y },
         { x: rShoulder.x, y: rShoulder.y },
-        
-        { x: lShoulder.x * 0.66 + lHip.x * 0.34, y: lShoulder.y * 0.66 + lHip.y * 0.34 },
-        { x: rShoulder.x * 0.66 + rHip.x * 0.34, y: rShoulder.y * 0.66 + rHip.y * 0.34 },
-        
-        { x: lShoulder.x * 0.34 + lHip.x * 0.66, y: lShoulder.y * 0.34 + lHip.y * 0.66 },
-        { x: rShoulder.x * 0.34 + rHip.x * 0.66, y: rShoulder.y * 0.34 + rHip.y * 0.66 },
-
         { x: lHip.x, y: lHip.y },
         { x: rHip.x, y: rHip.y }
       ];
@@ -588,25 +571,25 @@
         canvasCtx.strokeStyle = '#00ffcc';
         canvasCtx.lineWidth = 1.5;
         
-        for (let i = 0; i < 3; i++) {
-          const pTL = currentTorsoPoints[i * 2];
-          const pTR = currentTorsoPoints[i * 2 + 1];
-          const pBL = currentTorsoPoints[(i + 1) * 2];
-          const pBR = currentTorsoPoints[(i + 1) * 2 + 1];
+        // Desenare contur format din cele 4 puncte
+        const pTL = currentTorsoPoints[0];
+        const pTR = currentTorsoPoints[1];
+        const pBL = currentTorsoPoints[2];
+        const pBR = currentTorsoPoints[3];
 
-          canvasCtx.beginPath();
-          canvasCtx.moveTo(pTL.x, pTL.y);
-          canvasCtx.lineTo(pTR.x, pTR.y);
-          canvasCtx.lineTo(pBR.x, pBR.y);
-          canvasCtx.lineTo(pBL.x, pBL.y);
-          canvasCtx.closePath();
-          canvasCtx.stroke();
-        }
+        canvasCtx.beginPath();
+        canvasCtx.moveTo(pTL.x, pTL.y);
+        canvasCtx.lineTo(pTR.x, pTR.y);
+        canvasCtx.lineTo(pBR.x, pBR.y);
+        canvasCtx.lineTo(pBL.x, pBL.y);
+        canvasCtx.closePath();
+        canvasCtx.stroke();
 
+        // Desenare doar 4 buline pentru cele 4 puncte
         currentTorsoPoints.forEach(pt => {
           canvasCtx.fillStyle = '#ffffff';
           canvasCtx.beginPath();
-          canvasCtx.arc(pt.x, pt.y, 6, 0, Math.PI * 2);
+          canvasCtx.arc(pt.x, pt.y, 7, 0, Math.PI * 2);
           canvasCtx.fill();
           canvasCtx.strokeStyle = '#00ffcc';
           canvasCtx.stroke();
@@ -657,7 +640,7 @@
     });
 
     camera.start().then(() => {
-      statusDiv.innerText = "Sistem activ. Mărește/Trage punctele de pe ecran!";
+      statusDiv.innerText = "Sistem activ! Cadru scurtat cu 4 puncte.";
     });
   });
 </script>
