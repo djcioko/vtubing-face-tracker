@@ -2,321 +2,132 @@
 <html lang="ro">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>3D Studio Mapper - 8 Puncte</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body, html {
-      width: 100vw; height: 100vh; overflow: hidden;
-      background-color: #050508; color: #fff;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    }
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>VTuber Studio v2.5 - Camera Fixed & Record MP4</title>
 
-    #app-container {
-      width: 100vw; height: 100vh; position: relative;
-    }
-
-    canvas {
-      display: block; width: 100vw; height: 100vh;
-      background: #000; cursor: crosshair;
-    }
-
-    #top-bar {
-      position: absolute; top: 15px; left: 15px; z-index: 10;
-      background: rgba(10, 10, 20, 0.88); padding: 12px 16px;
-      border-radius: 10px; border: 1px solid rgba(0, 255, 204, 0.4);
-      backdrop-filter: blur(10px); display: flex; align-items: center; gap: 12px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-    }
-
-    #top-bar label {
-      font-size: 11px; font-weight: bold; color: #00ffcc; text-transform: uppercase;
-    }
-
-    .file-input { color: #ddd; font-size: 11px; cursor: pointer; }
-
-    .btn-action {
-      background: rgba(255, 255, 255, 0.1); color: #fff;
-      border: 1px solid rgba(255, 255, 255, 0.2); padding: 5px 10px;
-      font-size: 11px; border-radius: 6px; cursor: pointer; font-weight: bold;
-    }
-    .btn-action:hover { background: rgba(0, 255, 204, 0.2); border-color: #00ffcc; color: #00ffcc; }
-    .btn-reset { border-color: #ff3366; color: #ff3366; }
-    .btn-reset:hover { background: rgba(255, 51, 102, 0.2); }
-  </style>
+  <!-- MediaPipe CDNs -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
 </head>
 <body>
 
-<div id="app-container">
-  <div id="top-bar">
-    <label>ÎNCARCĂ (VIDEO / FOTO):</label>
-    <input type="file" id="mediaInput" accept="video/*,image/*" class="file-input">
-    <button id="toggle-grid" class="btn-action">Puncte: ON</button>
-    <button id="reset-btn" class="btn-action btn-reset">Resetare Grilă</button>
+  <div class="canvas-container" id="canvasContainer">
+    <video id="webcam" playsinline muted></video>
   </div>
 
-  <canvas id="canvas"></canvas>
-</div>
+  <div class="controls-panel">
+    <div class="btn-group">
+      <button id="recordBtn" class="btn btn-full btn-record">⏺ Începe Înregistrarea Video (MP4)</button>
+      <button id="toggleShowCam" class="btn">Camera Reală: OFF</button>
+      <button id="toggleAiCut" class="btn">AI Cut-Off: OFF</button>
+      <button id="toggleBodyTrack" class="btn">Urmărire Corp: OFF</button>
+    </div>
+  </div>
 
-<video id="vid" loop muted playsinline crossorigin="anonymous" style="display:none"></video>
+  <script>
+    let startTouchX = 0;
+    let startTouchY = 0;
 
-<script>
-  const canvas = document.getElementById('canvas');
-  const ctx = canvas.getContext('2d');
-  const videoElem = document.getElementById('vid');
-  const imageElem = new Image();
-  const mediaInput = document.getElementById('mediaInput');
-  const resetBtn = document.getElementById('reset-btn');
-  const toggleGridBtn = document.getElementById('toggle-grid');
+    let savedBgs = JSON.parse(localStorage.getItem('vtuber_bgs_v25') || '[]');
+    let savedAvatars = JSON.parse(localStorage.getItem('vtuber_avatars_v25') || '[]');
 
-  let showGrid = true;
-  let currentMedia = null;
+    const sliders = [scaleWidthSlider, scaleHeightSlider, rotationSlider, offsetXSlider, offsetYSlider, mouthXSlider, mouthYSlider, mouthWidthSlider, mouthSensSlider];
 
-  function resizeCanvas() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-  }
-  window.addEventListener('resize', resizeCanvas);
-  resizeCanvas();
-
-  /*
-      STRUCTURA CELOR 8 PUNCTE DE PE MARGINI:
-
-      p0 -------- p1 -------- p2
-       |                       |
-      p3          C           p4
-       |                       |
-      p5 -------- p6 -------- p7
-  */
-  function getDefaultPoints() {
-    const w = canvas.width;
-    const h = canvas.height;
-    return [
-      { x: w * 0.30, y: h * 0.20 }, // p0: Sus-Stânga
-      { x: w * 0.50, y: h * 0.20 }, // p1: Sus-Mijloc
-      { x: w * 0.70, y: h * 0.20 }, // p2: Sus-Dreapta
-      { x: w * 0.30, y: h * 0.50 }, // p3: Mijloc-Stânga
-      { x: w * 0.70, y: h * 0.50 }, // p4: Mijloc-Dreapta
-      { x: w * 0.30, y: h * 0.80 }, // p5: Jos-Stânga
-      { x: w * 0.50, y: h * 0.80 }, // p6: Jos-Mijloc
-      { x: w * 0.70, y: h * 0.80 }  // p7: Jos-Dreapta
-    ];
-  }
-
-  let pts = JSON.parse(localStorage.getItem('v40_mapper_8pts_config')) || getDefaultPoints();
-
-  function saveConfig() {
-    localStorage.setItem('v40_mapper_8pts_config', JSON.stringify(pts));
-  }
-
-  resetBtn.addEventListener('click', () => {
-    pts = getDefaultPoints();
-    saveConfig();
-  });
-
-  toggleGridBtn.addEventListener('click', () => {
-    showGrid = !showGrid;
-    toggleGridBtn.innerText = `Puncte: ${showGrid ? 'ON' : 'OFF'}`;
-  });
-
-  // Încărcare Media (Video sau Imagine)
-  mediaInput.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const url = URL.createObjectURL(file);
-
-    if (file.type.startsWith('video/')) {
-      videoElem.src = url;
-      videoElem.loop = true;
-      videoElem.muted = true;
-      videoElem.playsInline = true;
-
-      videoElem.onloadeddata = () => {
-        currentMedia = videoElem;
-        videoElem.play().catch(err => console.log('Autoplay blocked:', err));
+    function saveState() {
+      const state = {
+        activeAvatarIndex: savedAvatars.findIndex(a => activeAvatar && activeAvatar.src === a)
       };
-    } else if (file.type.startsWith('image/')) {
-      imageElem.onload = () => {
-        currentMedia = imageElem;
-      };
-      imageElem.src = url;
+
+      sliders.forEach(s => state[s.id] = s.value);
+
+      localStorage.setItem('vtuber_app_state_v25', JSON.stringify(state));
     }
-  });
 
-  // Logica de Drag & Drop (Puncte individuale și Cadru Întreg)
-  let dragPtIndex = -1;
-  let isDraggingWholeFrame = false;
-  let lastMouse = { x: 0, y: 0 };
+    function loadState() {
+      const saved = JSON.parse(localStorage.getItem('vtuber_app_state_v25') || '{}');
 
-  function isPointInsidePolygon(p, vs) {
-    let x = p.x, y = p.y, inside = false;
-    for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
-      let xi = vs[i].x, yi = vs[i].y, xj = vs[j].x, yj = vs[j].y;
-      let intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
-      if (intersect) inside = !inside;
+      flipH = saved.flipH || false;
+      flipV = saved.flipV || false;
     }
-    return inside;
-  }
 
-  function getMousePos(e) {
-    const rect = canvas.getBoundingClientRect();
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
-  }
+    // --- Înregistrare Video MP4 ---
+    recordBtn.addEventListener('click', () => {
+      if (!isRecording) {
+        startRecording();
+      } else {
+        mediaRecorder.stop();
+        isRecording = false;
+        recordBtn.classList.remove('recording');
+        recordBtn.innerText = '⏺ Începe Înregistrarea Video (MP4)';
+      }
+    });
 
-  canvas.addEventListener('mousedown', (e) => {
-    const mouse = getMousePos(e);
-    dragPtIndex = -1;
-    isDraggingWholeFrame = false;
+    function downloadVideo(url) {
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = `VTuber_Studio_v2.5_${Date.now()}.mp4`;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+      }, 100);
+    }
 
-    if (showGrid) {
-      for (let i = 0; i < pts.length; i++) {
-        if (Math.hypot(pts[i].x - mouse.x, pts[i].y - mouse.y) < 25) {
-          dragPtIndex = i;
-          break;
+    function renderGalleries() {
+      try {
+        localStorage.setItem('vtuber_bgs_v25', JSON.stringify(savedBgs));
+        localStorage.setItem('vtuber_avatars_v25', JSON.stringify(savedAvatars));
+      } catch(e) {
+        console.warn("Memorie stocare plină.");
+      }
+    }
+
+    faceMesh.setOptions({
+      maxNumFaces: 1,
+      refineLandmarks: true,
+      minDetectionConfidence: 0.5,
+      minTrackingConfidence: 0.5
+    });
+
+    faceMesh.onResults((results) => {
+      latestFaceResults = results;
+    });
+
+    const pose = new Pose({
+      // configurare pose...
+    });
+
+    async function initCamera() {
+      try {
+        videoElement.srcObject = stream;
+        await videoElement.play();
+
+        const camera = new Camera(videoElement, {
+          onFrame: async () => {
+            if (isAiCutOn || showRealCam) {
+              await selfieSegmentation.send({ image: videoElement });
+            }
+            if (isBodyTrackOn) {
+              await pose.send({ image: videoElement });
+            }
+            await faceMesh.send({ image: videoElement });
+          },
+          width: 500,
+          height: 500
+        });
+        camera.start();
+
+        function renderLoop() {
+          drawScene();
+          requestAnimationFrame(renderLoop);
         }
+        renderLoop();
+
+      } catch(err) {
+        statusEl.innerText = "Eroare la pornirea camerei! Verificați permisiunile.";
       }
     }
-
-    const outerPoly = [pts[0], pts[1], pts[2], pts[4], pts[7], pts[6], pts[5], pts[3]];
-    if (dragPtIndex === -1 && isPointInsidePolygon(mouse, outerPoly)) {
-      isDraggingWholeFrame = true;
-    }
-
-    lastMouse = mouse;
-  });
-
-  window.addEventListener('mousemove', (e) => {
-    if (dragPtIndex === -1 && !isDraggingWholeFrame) return;
-
-    const mouse = getMousePos(e);
-    const dx = mouse.x - lastMouse.x;
-    const dy = mouse.y - lastMouse.y;
-
-    if (dragPtIndex !== -1) {
-      pts[dragPtIndex].x = mouse.x;
-      pts[dragPtIndex].y = mouse.y;
-    } else if (isDraggingWholeFrame) {
-      pts.forEach(p => { p.x += dx; p.y += dy; });
-    }
-
-    lastMouse = mouse;
-    saveConfig();
-  });
-
-  window.addEventListener('mouseup', () => {
-    dragPtIndex = -1;
-    isDraggingWholeFrame = false;
-  });
-
-  // Funcția de deformare a texturei pe un triunghi (UV Mapping)
-  function drawTriangleUV(media, p0, p1, p2, u0, v0, u1, v1, u2, v2) {
-    const w = media.videoWidth || media.width || 1;
-    const h = media.videoHeight || media.height || 1;
-
-    ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(p0.x, p0.y);
-    ctx.lineTo(p1.x, p1.y);
-    ctx.lineTo(p2.x, p2.y);
-    ctx.closePath();
-    ctx.clip();
-
-    const x0 = p0.x, y0 = p0.y, x1 = p1.x, y1 = p1.y, x2 = p2.x, y2 = p2.y;
-    const sx0 = u0 * w, sy0 = v0 * h, sx1 = u1 * w, sy1 = v1 * h, sx2 = u2 * w, sy2 = v2 * h;
-
-    const denom = (sx0 * (sy1 - sy2) + sx1 * (sy2 - sy0) + sx2 * (sy0 - sy1));
-    if (Math.abs(denom) < 1e-5) { ctx.restore(); return; }
-
-    const a = (x0 * (sy1 - sy2) + x1 * (sy2 - sy0) + x2 * (sy0 - sy1)) / denom;
-    const c = (x0 * (sx2 - sx1) + x1 * (sx0 - sx2) + x2 * (sx1 - sx0)) / denom;
-    const e = (x0 * (sx1 * sy2 - sx2 * sy1) + x1 * (sx2 * sy0 - sx0 * sy2) + x2 * (sx0 * sy1 - sx1 * sy0)) / denom;
-
-    const b = (y0 * (sy1 - sy2) + y1 * (sy2 - sy0) + y2 * (sy0 - sy1)) / denom;
-    const d = (y0 * (sx2 - sx1) + y1 * (sx0 - sx2) + y2 * (sx1 - sx0)) / denom;
-    const f = (y0 * (sx1 * sy2 - sx2 * sy1) + y1 * (sx2 * sy0 - sx0 * sy2) + y2 * (sx0 * sy1 - sx1 * sy0)) / denom;
-
-    ctx.transform(a, b, c, d, e, f);
-    ctx.drawImage(media, 0, 0, w, h);
-    ctx.restore();
-  }
-
-  // Maparea completă a unui singur fișier media pe cele 8 puncte
-  function renderSingleVideo8Points(media) {
-    const [p0, p1, p2, p3, p4, p5, p6, p7] = pts;
-
-    // Calcularea centrului matematic (C)
-    const center = {
-      x: ((p1.x + p6.x) / 2 + (p3.x + p4.x) / 2) / 2,
-      y: ((p1.y + p6.y) / 2 + (p3.y + p4.y) / 2) / 2
-    };
-
-    // 1. SUS-STÂNGA
-    drawTriangleUV(media, p0, p1, center, 0, 0, 0.5, 0, 0.5, 0.5);
-    drawTriangleUV(media, p0, center, p3, 0, 0, 0.5, 0.5, 0, 0.5);
-
-    // 2. SUS-DREAPTA
-    drawTriangleUV(media, p1, p2, center, 0.5, 0, 1, 0, 0.5, 0.5);
-    drawTriangleUV(media, p2, p4, center, 1, 0, 1, 0.5, 0.5, 0.5);
-
-    // 3. JOS-DREAPTA
-    drawTriangleUV(media, center, p4, p7, 0.5, 0.5, 1, 0.5, 1, 1);
-    drawTriangleUV(media, center, p7, p6, 0.5, 0.5, 1, 1, 0.5, 1);
-
-    // 4. JOS-STÂNGA
-    drawTriangleUV(media, p3, center, p5, 0, 0.5, 0.5, 0.5, 0, 1);
-    drawTriangleUV(media, center, p6, p5, 0.5, 0.5, 0.5, 1, 0, 1);
-  }
-
-  function render() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    if (currentMedia) {
-      if (
-        currentMedia === imageElem ||
-        (currentMedia === videoElem && videoElem.readyState >= 2)
-      ) {
-        renderSingleVideo8Points(currentMedia);
-      }
-    }
-
-    if (showGrid) {
-      const [p0, p1, p2, p3, p4, p5, p6, p7] = pts;
-      const center = {
-        x: ((p1.x + p6.x) / 2 + (p3.x + p4.x) / 2) / 2,
-        y: ((p1.y + p6.y) / 2 + (p3.y + p4.y) / 2) / 2
-      };
-
-      ctx.strokeStyle = 'rgba(0, 255, 204, 0.5)';
-      ctx.lineWidth = 1.5;
-
-      // Linii contur și structură interioară
-      ctx.beginPath();
-      ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y);
-      ctx.lineTo(p4.x, p4.y); ctx.lineTo(p7.x, p7.y); ctx.lineTo(p6.x, p6.y);
-      ctx.lineTo(p5.x, p5.y); ctx.lineTo(p3.x, p3.y); ctx.closePath();
-
-      ctx.moveTo(p1.x, p1.y); ctx.lineTo(p6.x, p6.y);
-      ctx.moveTo(p3.x, p3.y); ctx.lineTo(p4.x, p4.y);
-      ctx.moveTo(p0.x, p0.y); ctx.lineTo(p7.x, p7.y);
-      ctx.moveTo(p2.x, p2.y); ctx.lineTo(p5.x, p5.y);
-      ctx.stroke();
-
-      // Puncte de control (cele 8 de pe margine)
-      pts.forEach((p, idx) => {
-        ctx.fillStyle = (idx === 1 || idx === 6 || idx === 3 || idx === 4) ? '#ff0055' : '#00ffcc';
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, 8, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = '#ffffff';
-        ctx.stroke();
-      });
-    }
-
-    requestAnimationFrame(render);
-  }
-
-  render();
-</script>
+  </script>
 </body>
 </html>
