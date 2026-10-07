@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>2D & 3D Rigging - Compact 4-Point Torso</title>
+  <title>Rigging Torso - Cadru Unic cu 6 Puncte</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body {
@@ -29,12 +29,11 @@
 
     #ui-overlay {
       position: absolute; top: 15px; left: 15px; z-index: 10;
-      display: flex; flex-direction: column; gap: 10px; width: 380px;
+      display: flex; flex-direction: column; gap: 10px; width: 360px;
       max-height: 92vh; overflow-y: auto;
       background: rgba(15, 15, 25, 0.92); padding: 15px; border-radius: 12px;
       border: 1px solid rgba(0, 255, 204, 0.3); backdrop-filter: blur(10px);
       box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
-      transition: opacity 0.3s ease;
     }
     #ui-overlay.hidden { display: none !important; }
 
@@ -47,22 +46,20 @@
 
     .btn-toggle {
       background: rgba(255, 255, 255, 0.1); color: #fff;
-      border: 1px solid rgba(255, 255, 255, 0.2); padding: 5px 8px;
-      font-size: 11px; border-radius: 6px; cursor: pointer; min-width: 65px;
-      text-align: center;
+      border: 1px solid rgba(255, 255, 255, 0.2); padding: 6px 10px;
+      font-size: 11px; border-radius: 6px; cursor: pointer;
     }
     .btn-toggle.active {
       background: rgba(0, 255, 204, 0.3); border-color: #00ffcc; color: #00ffcc; font-weight: bold;
     }
 
-    .upload-group {
+    .group {
       display: flex; flex-direction: column; gap: 8px;
       border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 10px;
     }
-    .upload-group label { color: #00ffcc; font-size: 11px; font-weight: bold; text-transform: uppercase; }
-    .file-input { color: #ccc; font-size: 11px; flex: 1; }
-    .row-btns { display: flex; gap: 6px; flex-wrap: wrap; }
-    .item-row { display: flex; align-items: center; gap: 8px; }
+    .group label { color: #00ffcc; font-size: 11px; font-weight: bold; text-transform: uppercase; }
+    .file-input { color: #ccc; font-size: 11px; width: 100%; }
+    .row { display: flex; gap: 6px; flex-wrap: wrap; }
     .scale-controls { display: flex; align-items: center; gap: 8px; color: #fff; font-size: 11px; }
     .scale-controls input[type="range"] { flex: 1; }
     #status { color: #00ffcc; font-size: 12px; font-weight: bold; }
@@ -70,94 +67,35 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/holistic/holistic.js" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 </head>
 <body>
 
 <div id="container">
-  <button id="ui-toggle-btn">👁️ Hide Controls</button>
+  <button id="ui-toggle-btn">👁️ Ascunde Meniul</button>
 
   <div id="ui-overlay">
-    <button id="start-btn" class="btn-main">▶ Pornire Camera & Rigging</button>
-    <div id="status">Apasă pe buton pentru start...</div>
+    <button id="start-btn" class="btn-main">▶ Pornește Camera & Rigging</button>
+    <div id="status">Apasă start pentru pornire...</div>
 
-    <div class="upload-group">
-      <label>Comutatoare Generale</label>
-      <div class="row-btns">
+    <div class="group">
+      <label>Opțiuni Cadru (6 Puncte)</label>
+      <div class="row">
         <button id="toggle-skeleton" class="btn-toggle active">Linii Cadru: ON</button>
-        <button id="toggle-crop" class="btn-toggle active">Crop AI: ON</button>
         <button id="toggle-hide-cam" class="btn-toggle">Camera: SHOW</button>
-        <button id="reset-offsets" class="btn-toggle" style="border-color:#ff0055; color:#ff3366;">Reset Cadru 4 Puncte</button>
+        <button id="reset-offsets" class="btn-toggle" style="border-color:#ff0055; color:#ff3366;">Reset Cadru 6 Puncte</button>
       </div>
     </div>
 
-    <div class="upload-group">
-      <label>Încărcare Măști & Segmente (Foto / Video)</label>
-      
-      <div class="item-row">
-        <button id="tog-head" class="btn-toggle active">Cap: ON</button>
-        <input type="file" id="file-head" accept="image/*,video/*" class="file-input">
-      </div>
-
-      <div class="item-row">
-        <button id="tog-torso" class="btn-toggle active">Torso Mesh: ON</button>
-        <input type="file" id="file-torso" accept="image/*,video/*" class="file-input">
-      </div>
-
-      <div class="item-row">
-        <button id="tog-arm-left" class="btn-toggle active">Braț L: ON</button>
-        <input type="file" id="file-arm-left" accept="image/*,video/*" class="file-input">
-      </div>
-
-      <div class="item-row">
-        <button id="tog-arm-right" class="btn-toggle active">Braț R: ON</button>
-        <input type="file" id="file-arm-right" accept="image/*,video/*" class="file-input">
-      </div>
+    <div class="group">
+      <label>Încărcare Imagine / Video Torso</label>
+      <input type="file" id="file-torso" accept="image/*,video/*" class="file-input">
     </div>
 
-    <div class="upload-group">
-      <label>Model 3D Separabil (GLB / GLTF)</label>
-      <div class="item-row">
-        <button id="tog-3d" class="btn-toggle active">Model 3D: ON</button>
-        <input type="file" id="file-3d" accept=".glb,.gltf" class="file-input">
-      </div>
+    <div class="group">
+      <label>Dimensiune Cadru Pe Verticală</label>
       <div class="scale-controls">
-        <span>Scală 3D:</span>
-        <input type="range" id="scale-3d" min="0.1" max="3.0" step="0.05" value="1.0">
-      </div>
-      <div class="scale-controls">
-        <span>Offset X 3D:</span>
-        <input type="range" id="offset-3d-x" min="-300" max="300" step="2" value="0">
-      </div>
-      <div class="scale-controls">
-        <span>Offset Y 3D:</span>
-        <input type="range" id="offset-3d-y" min="-300" max="300" step="2" value="0">
-      </div>
-    </div>
-
-    <div class="upload-group">
-      <label>Calibrare Manuală Cap & Torso</label>
-      <div class="scale-controls">
-        <span>Înalțime Torso:</span>
-        <input type="range" id="scale-torso-len" min="0.1" max="0.8" step="0.02" value="0.3">
-      </div>
-      <div class="scale-controls">
-        <span>Scală Cap:</span>
-        <input type="range" id="scale-head" min="0.3" max="4.0" step="0.05" value="1.0">
-      </div>
-      <div class="scale-controls">
-        <span>Grosime Brațe:</span>
-        <input type="range" id="scale-arms" min="0.5" max="3.0" step="0.1" value="1.0">
-      </div>
-    </div>
-
-    <div class="upload-group">
-      <label>Fundal Custom (Foto / Video)</label>
-      <div class="item-row">
-        <button id="tog-bg" class="btn-toggle active">Fundal: ON</button>
-        <input type="file" id="bg-file-upload" accept="image/*,video/*" class="file-input">
+        <span>Înălțime Cadru:</span>
+        <input type="range" id="scale-torso-len" min="0.1" max="1.0" step="0.02" value="0.5">
       </div>
     </div>
   </div>
@@ -169,7 +107,6 @@
 
 <script>
   const videoElement = document.getElementById('webcam');
-  const bgVideoElement = document.getElementById('bg-video');
   const canvasElement = document.getElementById('output_canvas');
   const canvasCtx = canvasElement.getContext('2d');
 
@@ -184,72 +121,30 @@
   uiToggleBtn.addEventListener('click', () => {
     isUiVisible = !isUiVisible;
     uiOverlay.classList.toggle('hidden', !isUiVisible);
-    uiToggleBtn.innerText = isUiVisible ? "👁️ Hide Controls" : "👁️ Show Controls";
+    uiToggleBtn.innerText = isUiVisible ? "👁️ Ascunde Meniul" : "👁️ Arată Meniul";
   });
 
   const toggleSkeletonBtn = document.getElementById('toggle-skeleton');
-  const toggleCropBtn = document.getElementById('toggle-crop');
   const toggleHideCamBtn = document.getElementById('toggle-hide-cam');
-  const tog3DBtn = document.getElementById('tog-3d');
-
-  const togHeadBtn = document.getElementById('tog-head');
-  const togTorsoBtn = document.getElementById('tog-torso');
-  const togArmLeftBtn = document.getElementById('tog-arm-left');
-  const togArmRightBtn = document.getElementById('tog-arm-right');
-  const togBgBtn = document.getElementById('tog-bg');
-
-  const inputHead = document.getElementById('file-head');
   const inputTorso = document.getElementById('file-torso');
-  const inputArmLeft = document.getElementById('file-arm-left');
-  const inputArmRight = document.getElementById('file-arm-right');
-  const input3D = document.getElementById('file-3d');
-  const bgFileUpload = document.getElementById('bg-file-upload');
-
   const sliderTorsoLen = document.getElementById('scale-torso-len');
-  const sliderHead = document.getElementById('scale-head');
-  const sliderArms = document.getElementById('scale-arms');
-  const slider3DScale = document.getElementById('scale-3d');
-  const slider3DX = document.getElementById('offset-3d-x');
-  const slider3DY = document.getElementById('offset-3d-y');
 
-  let showSkeleton = localStorage.getItem('app_showSkeleton') !== 'false';
-  let enableCrop = localStorage.getItem('app_crop') !== 'false';
-  let hideCamera = localStorage.getItem('app_hide_camera') === 'true';
-  let show3D = localStorage.getItem('app_vis_3d') !== 'false';
-  let showBg = localStorage.getItem('app_vis_bg') !== 'false';
+  let showSkeleton = localStorage.getItem('app_showSkeleton_6p') !== 'false';
+  let hideCamera = localStorage.getItem('app_hide_camera_6p') === 'true';
 
-  const partVis = {
-    head: localStorage.getItem('app_vis_head') !== 'false',
-    torso: localStorage.getItem('app_vis_torso') !== 'false',
-    armLeft: localStorage.getItem('app_vis_armLeft') !== 'false',
-    armRight: localStorage.getItem('app_vis_armRight') !== 'false'
-  };
-
-  // Ștergem vechea configurație cu 8 puncte dacă exista
+  // Ștergem complet datele vechi de la 8 și 4 puncte pentru a nu bloca aplicația
   localStorage.removeItem('app_torso_grid_offsets');
+  localStorage.removeItem('app_torso_offsets_4p');
 
-  // Salvăm STRICT 4 puncte (stânga sus, dreapta sus, stânga jos, dreapta jos)
-  let torsoGridOffsets = JSON.parse(localStorage.getItem('app_torso_offsets_4p')) || [
-    {x:0, y:0}, {x:0, y:0}, {x:0, y:0}, {x:0, y:0}
+  // STRICT 6 PUNCTE (3 Sus: Stânga, Centru, Dreapta | 3 Jos: Stânga, Centru, Dreapta)
+  let torsoGridOffsets = JSON.parse(localStorage.getItem('app_torso_offsets_6p')) || [
+    {x:0, y:0}, {x:0, y:0}, {x:0, y:0},
+    {x:0, y:0}, {x:0, y:0}, {x:0, y:0}
   ];
 
-  let headOffset = JSON.parse(localStorage.getItem('app_head_drag_offset')) || { x: 0, y: 0 };
-
-  let bgType = 'none';
-  let customBgImg = null;
-
-  const segmentAssets = {
-    head: { type: null, element: null },
-    torso: { type: null, element: null },
-    armLeft: { type: null, element: null },
-    armRight: { type: null, element: null }
-  };
-
+  let torsoAsset = { type: null, element: null };
   let draggingPointIndex = -1;
-  let isDraggingHead = false;
-  let dragStartMouse = { x: 0, y: 0 };
   let currentTorsoPoints = [];
-  let currentHeadCenter = null;
 
   function updateToggleUI(btn, state, textPrefix) {
     btn.classList.toggle('active', state);
@@ -257,113 +152,44 @@
   }
 
   updateToggleUI(toggleSkeletonBtn, showSkeleton, 'Linii Cadru');
-  updateToggleUI(toggleCropBtn, enableCrop, 'Crop AI');
   toggleHideCamBtn.innerText = `Camera: ${hideCamera ? 'HIDE' : 'SHOW'}`;
   toggleHideCamBtn.classList.toggle('active', !hideCamera);
 
-  updateToggleUI(tog3DBtn, show3D, 'Model 3D');
-  updateToggleUI(togHeadBtn, partVis.head, 'Cap');
-  updateToggleUI(togTorsoBtn, partVis.torso, 'Torso Mesh');
-  updateToggleUI(togArmLeftBtn, partVis.armLeft, 'Braț L');
-  updateToggleUI(togArmRightBtn, partVis.armRight, 'Braț R');
-  updateToggleUI(togBgBtn, showBg, 'Fundal');
-
   toggleSkeletonBtn.addEventListener('click', () => {
     showSkeleton = !showSkeleton;
-    localStorage.setItem('app_showSkeleton', showSkeleton);
+    localStorage.setItem('app_showSkeleton_6p', showSkeleton);
     updateToggleUI(toggleSkeletonBtn, showSkeleton, 'Linii Cadru');
-  });
-
-  toggleCropBtn.addEventListener('click', () => {
-    enableCrop = !enableCrop;
-    localStorage.setItem('app_crop', enableCrop);
-    updateToggleUI(toggleCropBtn, enableCrop, 'Crop AI');
   });
 
   toggleHideCamBtn.addEventListener('click', () => {
     hideCamera = !hideCamera;
-    localStorage.setItem('app_hide_camera', hideCamera);
+    localStorage.setItem('app_hide_camera_6p', hideCamera);
     toggleHideCamBtn.innerText = `Camera: ${hideCamera ? 'HIDE' : 'SHOW'}`;
     toggleHideCamBtn.classList.toggle('active', !hideCamera);
   });
 
-  tog3DBtn.addEventListener('click', () => {
-    show3D = !show3D;
-    localStorage.setItem('app_vis_3d', show3D);
-    updateToggleUI(tog3DBtn, show3D, 'Model 3D');
-  });
-
-  togHeadBtn.addEventListener('click', () => {
-    partVis.head = !partVis.head;
-    localStorage.setItem('app_vis_head', partVis.head);
-    updateToggleUI(togHeadBtn, partVis.head, 'Cap');
-  });
-
-  togTorsoBtn.addEventListener('click', () => {
-    partVis.torso = !partVis.torso;
-    localStorage.setItem('app_vis_torso', partVis.torso);
-    updateToggleUI(togTorsoBtn, partVis.torso, 'Torso Mesh');
-  });
-
-  togArmLeftBtn.addEventListener('click', () => {
-    partVis.armLeft = !partVis.armLeft;
-    localStorage.setItem('app_vis_armLeft', partVis.armLeft);
-    updateToggleUI(togArmLeftBtn, partVis.armLeft, 'Braț L');
-  });
-
-  togArmRightBtn.addEventListener('click', () => {
-    partVis.armRight = !partVis.armRight;
-    localStorage.setItem('app_vis_armRight', partVis.armRight);
-    updateToggleUI(togArmRightBtn, partVis.armRight, 'Braț R');
-  });
-
-  togBgBtn.addEventListener('click', () => {
-    showBg = !showBg;
-    localStorage.setItem('app_vis_bg', showBg);
-    updateToggleUI(togBgBtn, showBg, 'Fundal');
-  });
-
   resetBtn.addEventListener('click', () => {
-    torsoGridOffsets = [{x: 0, y: 0}, {x: 0, y: 0}, {x: 0, y: 0}, {x: 0, y: 0}];
-    headOffset = { x: 0, y: 0 };
-    sliderTorsoLen.value = 0.3;
-    localStorage.setItem('app_torso_offsets_4p', JSON.stringify(torsoGridOffsets));
-    localStorage.setItem('app_head_drag_offset', JSON.stringify(headOffset));
+    torsoGridOffsets = [
+      {x:0, y:0}, {x:0, y:0}, {x:0, y:0},
+      {x:0, y:0}, {x:0, y:0}, {x:0, y:0}
+    ];
+    sliderTorsoLen.value = 0.5;
+    localStorage.setItem('app_torso_offsets_6p', JSON.stringify(torsoGridOffsets));
   });
 
-  function handleGenericFileUpload(file, key) {
-    if (!file) return;
-    const url = URL.createObjectURL(file);
-    if (file.type.startsWith('video/')) {
-      const v = document.createElement('video');
-      v.src = url;
-      v.autoplay = true; v.loop = true; v.muted = true; v.playsInline = true;
-      v.play();
-      segmentAssets[key] = { type: 'video', element: v };
-    } else {
-      const img = new Image();
-      img.src = url;
-      segmentAssets[key] = { type: 'image', element: img };
-    }
-  }
-
-  inputHead.addEventListener('change', (e) => handleGenericFileUpload(e.target.files[0], 'head'));
-  inputTorso.addEventListener('change', (e) => handleGenericFileUpload(e.target.files[0], 'torso'));
-  inputArmLeft.addEventListener('change', (e) => handleGenericFileUpload(e.target.files[0], 'armLeft'));
-  inputArmRight.addEventListener('change', (e) => handleGenericFileUpload(e.target.files[0], 'armRight'));
-
-  bgFileUpload.addEventListener('change', (e) => {
+  inputTorso.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;
     const url = URL.createObjectURL(file);
     if (file.type.startsWith('video/')) {
-      bgType = 'video';
-      bgVideoElement.src = url;
-      bgVideoElement.play();
+      const v = document.createElement('video');
+      v.src = url; v.autoplay = true; v.loop = true; v.muted = true; v.playsInline = true;
+      v.play();
+      torsoAsset = { type: 'video', element: v };
     } else {
-      bgType = 'image';
-      customBgImg = new Image();
-      customBgImg.src = url;
+      const img = new Image();
+      img.src = url;
+      torsoAsset = { type: 'image', element: img };
     }
   });
 
@@ -406,17 +232,21 @@
     ctx.restore();
   }
 
-  function drawFullWarpedTorso(ctx, asset, points) {
-    if (!asset || !asset.element || points.length < 4) return;
+  // Randare imagine deformata pe grila de 6 puncte (4 triunghiuri)
+  function draw6PointWarpedMesh(ctx, asset, pts) {
+    if (!asset || !asset.element || pts.length < 6) return;
     const elem = asset.element;
 
-    const pTL = points[0]; 
-    const pTR = points[1]; 
-    const pBL = points[2]; 
-    const pBR = points[3]; 
+    const [p0, p1, p2, p3, p4, p5] = pts;
 
-    drawTriangleSubTexture(ctx, elem, pTL, pTR, pBL, 0, 0, 1, 0, 0, 1);
-    drawTriangleSubTexture(ctx, elem, pTR, pBR, pBL, 1, 0, 1, 1, 0, 1);
+    // Triunghi 1: Sus-Stânga
+    drawTriangleSubTexture(ctx, elem, p0, p1, p3, 0, 0, 0.5, 0, 0, 1);
+    // Triunghi 2: Jos-Stânga
+    drawTriangleSubTexture(ctx, elem, p1, p4, p3, 0.5, 0, 0.5, 1, 0, 1);
+    // Triunghi 3: Sus-Dreapta
+    drawTriangleSubTexture(ctx, elem, p1, p2, p4, 0.5, 0, 1, 0, 0.5, 1);
+    // Triunghi 4: Jos-Dreapta
+    drawTriangleSubTexture(ctx, elem, p2, p5, p4, 1, 0, 1, 1, 0.5, 1);
   }
 
   function getCanvasCoords(e) {
@@ -432,23 +262,14 @@
 
   function handleStart(e) {
     const pos = getCanvasCoords(e);
-    
-    if (currentTorsoPoints.length === 4) {
+    if (currentTorsoPoints.length === 6) {
       for (let i = 0; i < currentTorsoPoints.length; i++) {
         const pt = currentTorsoPoints[i];
         const dist = Math.hypot(pt.x - pos.x, pt.y - pos.y);
-        if (dist < 22) {
+        if (dist < 25) {
           draggingPointIndex = i;
           return;
         }
-      }
-    }
-
-    if (currentHeadCenter) {
-      const distHead = Math.hypot(currentHeadCenter.x - pos.x, currentHeadCenter.y - pos.y);
-      if (distHead < currentHeadCenter.radius) {
-        isDraggingHead = true;
-        dragStartMouse = { x: pos.x, y: pos.y };
       }
     }
   }
@@ -456,23 +277,14 @@
   function handleMove(e) {
     if (draggingPointIndex !== -1) {
       const pos = getCanvasCoords(e);
-      torsoGridOffsets[draggingPointIndex].x += pos.x - (currentTorsoPoints[draggingPointIndex].x);
-      torsoGridOffsets[draggingPointIndex].y += pos.y - (currentTorsoPoints[draggingPointIndex].y);
-      localStorage.setItem('app_torso_offsets_4p', JSON.stringify(torsoGridOffsets));
-    } else if (isDraggingHead) {
-      const pos = getCanvasCoords(e);
-      const dx = pos.x - dragStartMouse.x;
-      const dy = pos.y - dragStartMouse.y;
-      headOffset.x += dx;
-      headOffset.y += dy;
-      dragStartMouse = pos;
-      localStorage.setItem('app_head_drag_offset', JSON.stringify(headOffset));
+      torsoGridOffsets[draggingPointIndex].x += pos.x - currentTorsoPoints[draggingPointIndex].x;
+      torsoGridOffsets[draggingPointIndex].y += pos.y - currentTorsoPoints[draggingPointIndex].y;
+      localStorage.setItem('app_torso_offsets_6p', JSON.stringify(torsoGridOffsets));
     }
   }
 
   function handleEnd() {
     draggingPointIndex = -1;
-    isDraggingHead = false;
   }
 
   canvasElement.addEventListener('mousedown', handleStart);
@@ -487,14 +299,6 @@
     canvasCtx.save();
     canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
 
-    if (showBg) {
-      if (bgType === 'video' && bgVideoElement.readyState >= 2) {
-        canvasCtx.drawImage(bgVideoElement, 0, 0, canvasElement.width, canvasElement.height);
-      } else if (bgType === 'image' && customBgImg && customBgImg.complete) {
-        canvasCtx.drawImage(customBgImg, 0, 0, canvasElement.width, canvasElement.height);
-      }
-    }
-
     if (!hideCamera && results.image) {
       canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
     }
@@ -507,28 +311,28 @@
       const lShoulder = { x: lm[11].x * w, y: lm[11].y * h };
       const rShoulder = { x: lm[12].x * w, y: lm[12].y * h };
       
-      // Factor mic (0.3 implicit) pentru un cadru foarte scurt
-      const torsoScaleFactor = parseFloat(sliderTorsoLen.value);
+      const factor = parseFloat(sliderTorsoLen.value);
 
       const lHipRaw = { x: lm[23].x * w, y: lm[23].y * h };
       const rHipRaw = { x: lm[24].x * w, y: lm[24].y * h };
 
-      // Puncte jos foarte scurte
       const lHip = {
-        x: lShoulder.x + (lHipRaw.x - lShoulder.x) * torsoScaleFactor,
-        y: lShoulder.y + (lHipRaw.y - lShoulder.y) * torsoScaleFactor
+        x: lShoulder.x + (lHipRaw.x - lShoulder.x) * factor,
+        y: lShoulder.y + (lHipRaw.y - lShoulder.y) * factor
       };
       const rHip = {
-        x: rShoulder.x + (rHipRaw.x - rShoulder.x) * torsoScaleFactor,
-        y: rShoulder.y + (rHipRaw.y - rShoulder.y) * torsoScaleFactor
+        x: rShoulder.x + (rHipRaw.x - rShoulder.x) * factor,
+        y: rShoulder.y + (rHipRaw.y - rShoulder.y) * factor
       };
 
-      // Baza de 4 puncte
+      // Calcul puncte de mijloc pentru linia de sus și linia de jos
+      const topMid = { x: (lShoulder.x + rShoulder.x) / 2, y: (lShoulder.y + rShoulder.y) / 2 };
+      const botMid = { x: (lHip.x + rHip.x) / 2, y: (lHip.y + rHip.y) / 2 };
+
+      // Cele 6 puncte de baza
       const gridBase = [
-        { x: lShoulder.x, y: lShoulder.y },
-        { x: rShoulder.x, y: rShoulder.y },
-        { x: lHip.x, y: lHip.y },
-        { x: rHip.x, y: rHip.y }
+        lShoulder, topMid, rShoulder,
+        lHip,      botMid, rHip
       ];
 
       currentTorsoPoints = gridBase.map((pt, idx) => ({
@@ -536,77 +340,42 @@
         y: pt.y + torsoGridOffsets[idx].y
       }));
 
-      if (partVis.torso) {
-        drawFullWarpedTorso(canvasCtx, segmentAssets.torso, currentTorsoPoints);
-      }
+      // Deseneaza imaginea/clipul pe cele 6 puncte
+      draw6PointWarpedMesh(canvasCtx, torsoAsset, currentTorsoPoints);
 
-      if (results.faceLandmarks && partVis.head) {
-        const flm = results.faceLandmarks;
-        const nose = { x: flm[1].x * w, y: flm[1].y * h };
-        const topHead = { x: flm[10].x * w, y: flm[10].y * h };
-        const chin = { x: flm[152].x * w, y: flm[152].y * h };
-
-        const headRadius = Math.hypot(topHead.x - chin.x, topHead.y - chin.y) * parseFloat(sliderHead.value);
-        const centerHead = {
-          x: nose.x + headOffset.x,
-          y: nose.y + headOffset.y,
-          radius: headRadius
-        };
-        currentHeadCenter = centerHead;
-
-        if (segmentAssets.head.element) {
-          canvasCtx.save();
-          canvasCtx.beginPath();
-          canvasCtx.arc(centerHead.x, centerHead.y, headRadius, 0, Math.PI * 2);
-          canvasCtx.clip();
-          canvasCtx.drawImage(
-            segmentAssets.head.element,
-            centerHead.x - headRadius,
-            centerHead.y - headRadius,
-            headRadius * 2,
-            headRadius * 2
-          );
-          canvasCtx.restore();
-        }
-      }
-
+      // Deseneaza Liniile de Ghidaj si cele 6 CERCURI DE CONTROL
       if (showSkeleton) {
         canvasCtx.strokeStyle = '#00ffcc';
         canvasCtx.lineWidth = 2;
         
-        const pTL = currentTorsoPoints[0];
-        const pTR = currentTorsoPoints[1];
-        const pBL = currentTorsoPoints[2];
-        const pBR = currentTorsoPoints[3];
+        const [p0, p1, p2, p3, p4, p5] = currentTorsoPoints;
 
+        // Contur exterior
         canvasCtx.beginPath();
-        canvasCtx.moveTo(pTL.x, pTL.y);
-        canvasCtx.lineTo(pTR.x, pTR.y);
-        canvasCtx.lineTo(pBR.x, pBR.y);
-        canvasCtx.lineTo(pBL.x, pBL.y);
+        canvasCtx.moveTo(p0.x, p0.y);
+        canvasCtx.lineTo(p1.x, p1.y);
+        canvasCtx.lineTo(p2.x, p2.y);
+        canvasCtx.lineTo(p5.x, p5.y);
+        canvasCtx.lineTo(p4.x, p4.y);
+        canvasCtx.lineTo(p3.x, p3.y);
         canvasCtx.closePath();
         canvasCtx.stroke();
 
-        // Rămân doar cele 4 cerculețe
-        currentTorsoPoints.forEach(pt => {
-          canvasCtx.fillStyle = '#ffffff';
+        // Linie de divizare la mijloc
+        canvasCtx.beginPath();
+        canvasCtx.moveTo(p1.x, p1.y);
+        canvasCtx.lineTo(p4.x, p4.y);
+        canvasCtx.stroke();
+
+        // Deseneaza fix cele 6 cercuri de lucru
+        currentTorsoPoints.forEach((pt, idx) => {
+          canvasCtx.fillStyle = (idx === 1 || idx === 4) ? '#ff0055' : '#ffffff';
           canvasCtx.beginPath();
           canvasCtx.arc(pt.x, pt.y, 8, 0, Math.PI * 2);
           canvasCtx.fill();
           canvasCtx.strokeStyle = '#00ffcc';
           canvasCtx.stroke();
         });
-
-        if (currentHeadCenter) {
-          canvasCtx.strokeStyle = '#00ffff';
-          canvasCtx.beginPath();
-          canvasCtx.arc(currentHeadCenter.x, currentHeadCenter.y, currentHeadCenter.radius, 0, Math.PI * 2);
-          canvasCtx.stroke();
-          canvasCtx.fillStyle = '#00ffff';
-          canvasCtx.beginPath();
-          canvasCtx.arc(currentHeadCenter.x, currentHeadCenter.y, 4, 0, Math.PI * 2);
-          canvasCtx.fill();
-        }
       }
     }
 
@@ -621,15 +390,14 @@
   holistic.setOptions({
     modelComplexity: 1,
     smoothLandmarks: true,
-    enableSegmentation: false,
-    refineFaceLandmarks: true
+    enableSegmentation: false
   });
 
   holistic.onResults(onResults);
 
   startBtn.addEventListener('click', () => {
     startBtn.disabled = true;
-    statusDiv.innerText = "Se inițializează camera & AI...";
+    statusDiv.innerText = "Se inițializează camera...";
 
     camera = new Camera(videoElement, {
       onFrame: async () => {
@@ -642,7 +410,7 @@
     });
 
     camera.start().then(() => {
-      statusDiv.innerText = "Gata! Cadru compact (4 puncte).";
+      statusDiv.innerText = "Gata! Cadru unic cu 6 puncte active.";
     });
   });
 </script>
