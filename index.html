@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>VTuber Studio v2.5 - Interactive & FX Edition</title>
+  <title>VTuber Studio v2.5 - Fixed Camera & Touch</title>
 
   <!-- MediaPipe CDNs -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
@@ -99,7 +99,7 @@
   </div>
 
   <div class="controls-panel" id="controlsPanel">
-    <!-- Comutatoare Cam/AI/Mască -->
+    <!-- Comutatoare Cam/AI/Mastră -->
     <div class="btn-group">
       <button id="toggleShowCam" class="btn">Camera Reală: OFF</button>
       <button id="toggleAiCut" class="btn">AI Cut-Off Corp: OFF</button>
@@ -209,9 +209,7 @@
 
     // Salvare / Încărcare
     function saveState() {
-      const state = {
-        flipH, flipV, showRealCam, isAiCutOn, isMaskOnly, fxHearts, fxSmoke, fxSparks
-      };
+      const state = { flipH, flipV, showRealCam, isAiCutOn, isMaskOnly, fxHearts, fxSmoke, fxSparks };
       sliders.forEach(s => state[s.id] = s.value);
       localStorage.setItem('vtuber_app_state_v25', JSON.stringify(state));
     }
@@ -257,4 +255,365 @@
     toggleAiCut.addEventListener('click', () => { isAiCutOn = !isAiCutOn; updateUIState(); saveState(); });
     toggleMaskOnly.addEventListener('click', () => { isMaskOnly = !isMaskOnly; updateUIState(); saveState(); });
     toggleFlipH.addEventListener('click', () => { flipH = !flipH; saveState(); });
-    
+    toggleFlipV.addEventListener('click', () => { flipV = !flipV; saveState(); });
+
+    toggleHearts.addEventListener('click', () => { fxHearts = !fxHearts; updateUIState(); saveState(); });
+    toggleSmoke.addEventListener('click', () => { fxSmoke = !fxSmoke; updateUIState(); saveState(); });
+    toggleSparks.addEventListener('click', () => { fxSparks = !fxSparks; updateUIState(); saveState(); });
+
+    // Touch & Drag Direct pe Ecran (Fără inversări de axă)
+    let touchState = { dragging: false, startX: 0, startY: 0, initialOffsetX: 0, initialOffsetY: 0, initialPinchDist: 0, initialScaleW: 1, initialScaleH: 1 };
+
+    canvasElement.addEventListener('pointerdown', (e) => {
+      touchState.dragging = true;
+      touchState.startX = e.clientX;
+      touchState.startY = e.clientY;
+      touchState.initialOffsetX = parseFloat(offsetXSlider.value);
+      touchState.initialOffsetY = parseFloat(offsetYSlider.value);
+    });
+
+    window.addEventListener('pointermove', (e) => {
+      if (!touchState.dragging) return;
+      const dx = e.clientX - touchState.startX;
+      const dy = e.clientY - touchState.startY;
+      // Mutare directă naturală fără inversări
+      offsetXSlider.value = touchState.initialOffsetX + dx;
+      offsetYSlider.value = touchState.initialOffsetY + dy;
+      saveState();
+    });
+
+    window.addEventListener('pointerup', () => touchState.dragging = false);
+
+    // Multitouch Pinch-to-Zoom pe mobil
+    canvasElement.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 2) {
+        touchState.initialPinchDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+        touchState.initialScaleW = parseFloat(scaleWidthSlider.value);
+        touchState.initialScaleH = parseFloat(scaleHeightSlider.value);
+      }
+    });
+
+    canvasElement.addEventListener('touchmove', (e) => {
+      if (e.touches.length === 2 && touchState.initialPinchDist > 0) {
+        const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+        const factor = dist / touchState.initialPinchDist;
+        scaleWidthSlider.value = (touchState.initialScaleW * factor).toFixed(2);
+        scaleHeightSlider.value = (touchState.initialScaleH * factor).toFixed(2);
+        saveState();
+      }
+    });
+
+    // Upload & Galerii
+    bgUploader.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          const res = evt.target.result;
+          savedBgs.push({ data: res, type: file.type.startsWith('video') ? 'video' : 'image' });
+          renderGalleries();
+          selectBg(res, file.type.startsWith('video') ? 'video' : 'image');
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    avatarUploader.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          savedAvatars.push(evt.target.result);
+          renderGalleries();
+          selectAvatar(evt.target.result);
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    function selectBg(src, type) {
+      activeBgType = type;
+      if (type === 'video') {
+        bgVideoElement.src = src;
+        bgVideoElement.play();
+      } else {
+        bgVideoElement.pause();
+        const img = new Image();
+        img.src = src;
+        img.onload = () => { activeBgImg = img; };
+      }
+    }
+
+    function selectAvatar(src) {
+      const img = new Image();
+      img.src = src;
+      img.onload = () => { activeAvatarImg = img; };
+    }
+
+    function renderGalleries() {
+      try {
+        localStorage.setItem('vtuber_bgs_v25', JSON.stringify(savedBgs));
+        localStorage.setItem('vtuber_avatars_v25', JSON.stringify(savedAvatars));
+      } catch(e) {}
+
+      bgGallery.innerHTML = '';
+      savedBgs.forEach(item => {
+        const bgSrc = typeof item === 'string' ? item : item.data;
+        const bgType = typeof item === 'string' ? 'image' : item.type;
+        const el = document.createElement(bgType === 'video' ? 'video' : 'img');
+        el.src = bgSrc;
+        el.className = 'gallery-item';
+        el.onclick = () => selectBg(bgSrc, bgType);
+        bgGallery.appendChild(el);
+      });
+
+      avatarGallery.innerHTML = '';
+      savedAvatars.forEach(src => {
+        const img = document.createElement('img');
+        img.src = src;
+        img.className = 'gallery-item';
+        img.onclick = () => selectAvatar(src);
+        avatarGallery.appendChild(img);
+      });
+    }
+
+    // Audio VU Meter Analyser
+    let audioCtx, analyser, micStream;
+    async function initAudioVU() {
+      try {
+        micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        analyser = audioCtx.createAnalyser();
+        const source = audioCtx.createMediaStreamSource(micStream);
+        source.connect(analyser);
+        analyser.fftSize = 64;
+
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+        function updateVU() {
+          if (micActive) {
+            analyser.getByteFrequencyData(dataArray);
+            let average = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
+            let val = Math.min(100, Math.max(0, average * 1.5));
+            vuFill.style.width = `${val}%`;
+          } else {
+            vuFill.style.width = '0%';
+          }
+          requestAnimationFrame(updateVU);
+        }
+        updateVU();
+      } catch (err) {
+        console.log("Eroare acces microfon VU Meter:", err);
+      }
+    }
+
+    toggleVuBtn.addEventListener('click', () => {
+      micActive = !micActive;
+      toggleVuBtn.innerText = `🎤 Mic: ${micActive ? 'ON' : 'OFF'}`;
+    });
+
+    // Particle FX Engine
+    let particles = [];
+    function drawParticles(w, h) {
+      if (fxHearts && Math.random() < 0.1) {
+        particles.push({ x: Math.random() * w, y: h + 20, speed: 1 + Math.random() * 2, size: 16 + Math.random() * 12, type: 'heart', alpha: 1 });
+      }
+      if (fxSmoke && Math.random() < 0.2) {
+        particles.push({ x: Math.random() * w, y: h + 30, speed: 0.5 + Math.random() * 1.5, size: 30 + Math.random() * 40, type: 'smoke', alpha: 0.6, hue: (Date.now() / 20) % 360 });
+      }
+      if (fxSparks && Math.random() < 0.3) {
+        particles.push({ x: Math.random() * w, y: Math.random() * h, speed: 0.2, size: 2 + Math.random() * 4, type: 'spark', alpha: 1, life: 30 });
+      }
+
+      for (let i = particles.length - 1; i >= 0; i--) {
+        let p = particles[i];
+        if (p.type === 'heart') {
+          p.y -= p.speed;
+          canvasCtx.font = `${p.size}px sans-serif`;
+          canvasCtx.fillText('💖', p.x, p.y);
+          if (p.y < -20) particles.splice(i, 1);
+        } else if (p.type === 'smoke') {
+          p.y -= p.speed;
+          p.alpha -= 0.003;
+          canvasCtx.beginPath();
+          canvasCtx.fillStyle = `hsla(${p.hue}, 80%, 60%, ${Math.max(0, p.alpha)})`;
+          canvasCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+          canvasCtx.fill();
+          if (p.alpha <= 0 || p.y < -50) particles.splice(i, 1);
+        } else if (p.type === 'spark') {
+          p.life--;
+          canvasCtx.beginPath();
+          canvasCtx.fillStyle = `rgba(255, 225, 100, ${p.life / 30})`;
+          canvasCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+          canvasCtx.fill();
+          if (p.life <= 0) particles.splice(i, 1);
+        }
+      }
+    }
+
+    // Înregistrare Video MP4
+    quickRecordBtn.addEventListener('click', () => { if (!isRecording) startRecording(); else stopRecording(); });
+
+    async function startRecording() {
+      recordedChunks = [];
+      const canvasStream = canvasElement.captureStream(30);
+      let combinedStream = canvasStream;
+
+      if (micStream && micActive) {
+        combinedStream = new MediaStream([...canvasStream.getVideoTracks(), micStream.getAudioTracks()[0]]);
+      }
+
+      let options = { mimeType: 'video/webm;codecs=vp9' };
+      if (!MediaRecorder.isTypeSupported(options.mimeType)) options = { mimeType: 'video/webm' };
+      
+      try { mediaRecorder = new MediaRecorder(combinedStream, options); } 
+      catch (e) { mediaRecorder = new MediaRecorder(combinedStream); }
+
+      mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(recordedChunks, { type: 'video/mp4' });
+        const url = URL.createObjectURL(blob);
+        downloadVideo(url);
+      };
+
+      mediaRecorder.start();
+      isRecording = true;
+      quickRecordBtn.classList.add('recording');
+      quickRecordBtn.innerText = '⏹';
+    }
+
+    function stopRecording() {
+      mediaRecorder.stop();
+      isRecording = false;
+      quickRecordBtn.classList.remove('recording');
+      quickRecordBtn.innerText = '⏺';
+    }
+
+    function downloadVideo(url) {
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = `VTuber_Record_${Date.now()}.mp4`;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { document.body.removeChild(a); window.URL.revokeObjectURL(url); }, 100);
+    }
+
+    // MediaPipe Setup & Tracking Fix
+    let latestFaceResults = null;
+    let latestSegmentationResults = null;
+
+    const faceMesh = new FaceMesh({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}` });
+    faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5 });
+    faceMesh.onResults((r) => { latestFaceResults = r; });
+
+    const selfieSegmentation = new SelfieSegmentation({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${f}` });
+    selfieSegmentation.setOptions({ modelSelection: 1 });
+    selfieSegmentation.onResults((r) => { latestSegmentationResults = r; });
+
+    // Render Main Canvas Loop
+    function drawScene() {
+      canvasElement.width = window.innerWidth;
+      canvasElement.height = window.innerHeight;
+      const w = canvasElement.width;
+      const h = canvasElement.height;
+
+      canvasCtx.save();
+      canvasCtx.clearRect(0, 0, w, h);
+
+      canvasCtx.translate(flipH ? w : 0, flipV ? h : 0);
+      canvasCtx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
+
+      // 1. Fundal
+      if (activeBgType === 'image' && activeBgImg) {
+        canvasCtx.drawImage(activeBgImg, 0, 0, w, h);
+      } else if (activeBgType === 'video' && bgVideoElement.readyState >= 2) {
+        canvasCtx.drawImage(bgVideoElement, 0, 0, w, h);
+      }
+
+      // 2. Camera Reală
+      if (showRealCam && videoElement.readyState >= 2) {
+        if (isAiCutOn && latestSegmentationResults) {
+          canvasCtx.save();
+          canvasCtx.drawImage(latestSegmentationResults.segmentationMask, 0, 0, w, h);
+          canvasCtx.globalCompositeOperation = 'source-in';
+          canvasCtx.drawImage(videoElement, 0, 0, w, h);
+          canvasCtx.restore();
+        } else {
+          canvasCtx.drawImage(videoElement, 0, 0, w, h);
+        }
+      }
+
+      // 3. Mască PNG
+      if (latestFaceResults && latestFaceResults.multiFaceLandmarks.length > 0) {
+        statusEl.innerText = "Tracking Activ";
+        const landmarks = latestFaceResults.multiFaceLandmarks[0];
+
+        const nose = landmarks[1];
+        const headX = nose.x * w + parseFloat(offsetXSlider.value);
+        const headY = nose.y * h + parseFloat(offsetYSlider.value);
+
+        const scaleW = parseFloat(scaleWidthSlider.value);
+        const scaleH = parseFloat(scaleHeightSlider.value);
+        const rot = parseFloat(rotationSlider.value) * Math.PI / 180;
+
+        if (activeAvatarImg && isMaskOnly) {
+          canvasCtx.save();
+          canvasCtx.translate(headX, headY);
+          canvasCtx.rotate(rot);
+          const avW = activeAvatarImg.width * scaleW;
+          const avH = activeAvatarImg.height * scaleH;
+          canvasCtx.drawImage(activeAvatarImg, -avW / 2, -avH / 2, avW, avH);
+          canvasCtx.restore();
+        }
+      } else {
+        statusEl.innerText = "Căutare față...";
+      }
+
+      // 4. Efecte Particles
+      drawParticles(w, h);
+
+      canvasCtx.restore();
+    }
+
+    // Init Camera (Rulată corect prin window.Camera din camera_utils)
+    async function initCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 }, audio: false });
+        videoElement.srcObject = stream;
+        await videoElement.play();
+
+        const camera = new window.Camera(videoElement, {
+          onFrame: async () => {
+            if (isAiCutOn || showRealCam) await selfieSegmentation.send({ image: videoElement });
+            await faceMesh.send({ image: videoElement });
+          },
+          width: 640, height: 480
+        });
+        camera.start();
+
+        function renderLoop() {
+          drawScene();
+          requestAnimationFrame(renderLoop);
+        }
+        renderLoop();
+
+      } catch(err) {
+        statusEl.innerText = "Eroare pornire cameră!";
+        console.error(err);
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      loadState();
+      renderGalleries();
+      if (savedBgs.length > 0) {
+        const firstBg = savedBgs[0];
+        selectBg(typeof firstBg === 'string' ? firstBg : firstBg.data, typeof firstBg === 'string' ? 'image' : firstBg.type);
+      }
+      if (savedAvatars.length > 0) selectAvatar(savedAvatars[0]);
+      initCamera();
+      initAudioVU();
+    });
+  </script>
+</body>
+</html>
