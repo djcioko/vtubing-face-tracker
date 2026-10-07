@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>VTuber Studio v2.5 - Clean Version</title>
+  <title>VTuber Studio v2.5 - Interactive & FX Edition</title>
 
   <!-- MediaPipe CDNs -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
@@ -12,14 +12,14 @@
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js" crossorigin="anonymous"></script>
 
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    * { box-sizing: border-box; margin: 0; padding: 0; touch-action: none; }
     body, html { width: 100%; height: 100%; background: #000; color: #fff; font-family: sans-serif; overflow: hidden; }
     
     .canvas-container { position: relative; width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; }
     canvas { width: 100%; height: 100%; object-fit: cover; }
     #webcam, #bgVideo { display: none; }
     
-    /* Overlay Floating Buttons (Vizibile permanent în Fullscreen) */
+    /* Overlay Floating Buttons */
     .floating-btn {
       position: absolute; z-index: 100;
       background: rgba(0, 0, 0, 0.65); color: #fff; border: 1px solid rgba(255, 255, 255, 0.2);
@@ -34,6 +34,15 @@
     #fullscreenToggle { top: 15px; right: 15px; border-radius: 8px; width: auto; padding: 0 12px; font-size: 13px; }
 
     @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
+
+    /* VU Meter Vizualizer */
+    .vu-container {
+      position: absolute; bottom: 15px; right: 15px; z-index: 100;
+      display: flex; align-items: center; gap: 8px; background: rgba(0, 0, 0, 0.6);
+      padding: 6px 10px; border-radius: 20px; border: 1px solid #333; backdrop-filter: blur(4px);
+    }
+    .vu-bar-bg { width: 80px; height: 10px; background: #222; border-radius: 5px; overflow: hidden; border: 1px solid #444; }
+    .vu-bar-fill { width: 0%; height: 100%; background: linear-gradient(90deg, #2a9d8f, #e9c46a, #e63946); transition: width 0.05s ease; }
 
     /* Panou Controale */
     .controls-panel { 
@@ -50,8 +59,8 @@
     .btn-group { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
     .btn { padding: 8px 10px; border: none; border-radius: 6px; background: #2a2a2a; color: white; cursor: pointer; font-size: 12px; }
     .btn:hover { background: #3d3d3d; }
+    .btn-active { background: #2a9d8f !important; font-weight: bold; }
     
-    /* Upload / Galerii */
     .upload-section { display: flex; gap: 6px; }
     .file-input { display: none; }
     .btn-upload { background: #2a9d8f; flex: 1; text-align: center; }
@@ -60,24 +69,28 @@
     .gallery-label { font-size: 11px; color: #aaa; margin-top: 4px; }
     .gallery { display: flex; gap: 6px; overflow-x: auto; padding: 4px 0; }
     .gallery-item { width: 42px; height: 42px; border-radius: 6px; object-fit: cover; border: 2px solid #444; cursor: pointer; flex-shrink: 0; }
-    .gallery-item.active { border-color: #2a9d8f; }
 
-    /* Sliders */
     .slider-group { display: flex; flex-direction: column; gap: 5px; font-size: 11px; }
     .slider-row { display: flex; justify-content: space-between; align-items: center; }
     .slider-row input { width: 55%; }
 
-    #status { position: absolute; bottom: 15px; right: 15px; background: rgba(0,0,0,0.6); padding: 4px 8px; border-radius: 4px; font-size: 11px; z-index: 80; color: #888; }
+    #status { position: absolute; top: 15px; left: 120px; background: rgba(0,0,0,0.6); padding: 4px 8px; border-radius: 4px; font-size: 11px; z-index: 80; color: #888; }
   </style>
 </head>
 <body>
 
   <div id="status">Pornire VTuber Studio...</div>
   
-  <!-- Butoane Rapide Vizibile pe Ecran / Fullscreen -->
-  <button id="togglePanelBtn" class="floating-btn" title="Ascunde/Afișează Meniul">👁</button>
+  <!-- Butoane Rapide -->
+  <button id="togglePanelBtn" class="floating-btn" title="Meniu">👁</button>
   <button id="quickRecordBtn" class="floating-btn" title="Înregistrare MP4">⏺</button>
   <button id="fullscreenToggle" class="floating-btn">🔲 Fullscreen</button>
+
+  <!-- VU Meter Widget -->
+  <div class="vu-container">
+    <button id="toggleVuBtn" class="btn" style="padding: 2px 6px; font-size: 10px;">🎤 Mic: ON</button>
+    <div class="vu-bar-bg"><div id="vuFill" class="vu-bar-fill"></div></div>
+  </div>
 
   <div class="canvas-container" id="canvasContainer">
     <video id="webcam" playsinline muted></video>
@@ -90,13 +103,20 @@
     <div class="btn-group">
       <button id="toggleShowCam" class="btn">Camera Reală: OFF</button>
       <button id="toggleAiCut" class="btn">AI Cut-Off Corp: OFF</button>
-      <button id="toggleBodyTrack" class="btn">Urmărire Corp: OFF</button>
       <button id="toggleMaskOnly" class="btn">Doar Mască VTuber: ON</button>
       <button id="toggleFlipH" class="btn">Oglindire Orizontală</button>
       <button id="toggleFlipV" class="btn">Oglindire Verticală</button>
     </div>
 
-    <!-- Upload Resurse (Foto/Video Fundal & PNG Fata) -->
+    <!-- Efecte Speciale Overlay -->
+    <div class="gallery-label">Efecte Speciale Vizuale:</div>
+    <div class="btn-group">
+      <button id="toggleHearts" class="btn">💖 Inimioare: OFF</button>
+      <button id="toggleSmoke" class="btn">💨 Fum RGB: OFF</button>
+      <button id="toggleSparks" class="btn">✨ Scântei: OFF</button>
+    </div>
+
+    <!-- Upload Resurse -->
     <div class="upload-section">
       <label class="btn btn-upload">
         🖼 Upload Fundal (Foto/Video)
@@ -118,11 +138,11 @@
 
     <!-- Sliders Ajustare Avatar Față -->
     <div class="slider-group">
-      <div class="slider-row"><label>Lățime Față:</label><input type="range" id="scaleWidthSlider" min="0.1" max="3" step="0.1" value="1"></div>
-      <div class="slider-row"><label>Înălțime Față:</label><input type="range" id="scaleHeightSlider" min="0.1" max="3" step="0.1" value="1"></div>
+      <div class="slider-row"><label>Lățime Față:</label><input type="range" id="scaleWidthSlider" min="0.1" max="3" step="0.05" value="1"></div>
+      <div class="slider-row"><label>Înălțime Față:</label><input type="range" id="scaleHeightSlider" min="0.1" max="3" step="0.05" value="1"></div>
       <div class="slider-row"><label>Rotație Față:</label><input type="range" id="rotationSlider" min="-180" max="180" step="1" value="0"></div>
-      <div class="slider-row"><label>Offset X Față:</label><input type="range" id="offsetXSlider" min="-300" max="300" step="1" value="0"></div>
-      <div class="slider-row"><label>Offset Y Față:</label><input type="range" id="offsetYSlider" min="-300" max="300" step="1" value="0"></div>
+      <div class="slider-row"><label>Offset X Față:</label><input type="range" id="offsetXSlider" min="-500" max="500" step="1" value="0"></div>
+      <div class="slider-row"><label>Offset Y Față:</label><input type="range" id="offsetYSlider" min="-500" max="500" step="1" value="0"></div>
     </div>
   </div>
 
@@ -138,13 +158,19 @@
     const quickRecordBtn = document.getElementById('quickRecordBtn');
     const fullscreenToggle = document.getElementById('fullscreenToggle');
 
-    // UI Buttons
+    const vuFill = document.getElementById('vuFill');
+    const toggleVuBtn = document.getElementById('toggleVuBtn');
+
+    // UI Buttons & Sliders
     const toggleShowCam = document.getElementById('toggleShowCam');
     const toggleAiCut = document.getElementById('toggleAiCut');
-    const toggleBodyTrack = document.getElementById('toggleBodyTrack');
     const toggleMaskOnly = document.getElementById('toggleMaskOnly');
     const toggleFlipH = document.getElementById('toggleFlipH');
     const toggleFlipV = document.getElementById('toggleFlipV');
+
+    const toggleHearts = document.getElementById('toggleHearts');
+    const toggleSmoke = document.getElementById('toggleSmoke');
+    const toggleSparks = document.getElementById('toggleSparks');
 
     const bgUploader = document.getElementById('bgUploader');
     const avatarUploader = document.getElementById('avatarUploader');
@@ -160,13 +186,17 @@
     // Stări
     let showRealCam = false;
     let isAiCutOn = false;
-    let isBodyTrackOn = false;
     let isMaskOnly = true;
     let isRecording = false;
     let mediaRecorder = null;
     let recordedChunks = [];
     let flipH = false;
     let flipV = false;
+
+    let fxHearts = false;
+    let fxSmoke = false;
+    let fxSparks = false;
+    let micActive = true;
 
     let activeBgType = null;
     let activeBgImg = null;
@@ -177,15 +207,10 @@
 
     const sliders = [scaleWidthSlider, scaleHeightSlider, rotationSlider, offsetXSlider, offsetYSlider];
 
-    // Salvare Stare
+    // Salvare / Încărcare
     function saveState() {
       const state = {
-        flipH: flipH,
-        flipV: flipV,
-        showRealCam: showRealCam,
-        isAiCutOn: isAiCutOn,
-        isBodyTrackOn: isBodyTrackOn,
-        isMaskOnly: isMaskOnly
+        flipH, flipV, showRealCam, isAiCutOn, isMaskOnly, fxHearts, fxSmoke, fxSparks
       };
       sliders.forEach(s => state[s.id] = s.value);
       localStorage.setItem('vtuber_app_state_v25', JSON.stringify(state));
@@ -197,316 +222,39 @@
       flipV = saved.flipV || false;
       showRealCam = saved.showRealCam || false;
       isAiCutOn = saved.isAiCutOn || false;
-      isBodyTrackOn = saved.isBodyTrackOn || false;
       isMaskOnly = saved.isMaskOnly !== undefined ? saved.isMaskOnly : true;
+      fxHearts = saved.fxHearts || false;
+      fxSmoke = saved.fxSmoke || false;
+      fxSparks = saved.fxSparks || false;
 
-      sliders.forEach(s => {
-        if (saved[s.id] !== undefined) s.value = saved[s.id];
-      });
-
+      sliders.forEach(s => { if (saved[s.id] !== undefined) s.value = saved[s.id]; });
       updateUIState();
     }
 
     function updateUIState() {
       toggleShowCam.innerText = `Camera Reală: ${showRealCam ? 'ON' : 'OFF'}`;
       toggleAiCut.innerText = `AI Cut-Off Corp: ${isAiCutOn ? 'ON' : 'OFF'}`;
-      toggleBodyTrack.innerText = `Urmărire Corp: ${isBodyTrackOn ? 'ON' : 'OFF'}`;
       toggleMaskOnly.innerText = `Doar Mască VTuber: ${isMaskOnly ? 'ON' : 'OFF'}`;
+      
+      toggleHearts.innerText = `💖 Inimioare: ${fxHearts ? 'ON' : 'OFF'}`;
+      toggleSmoke.innerText = `💨 Fum RGB: ${fxSmoke ? 'ON' : 'OFF'}`;
+      toggleSparks.innerText = `✨ Scântei: ${fxSparks ? 'ON' : 'OFF'}`;
+
+      toggleHearts.classList.toggle('btn-active', fxHearts);
+      toggleSmoke.classList.toggle('btn-active', fxSmoke);
+      toggleSparks.classList.toggle('btn-active', fxSparks);
     }
 
     sliders.forEach(s => s.addEventListener('input', saveState));
 
-    // Ascundere / Afișare Meniu cu butonul Ochi (👁)
-    togglePanelBtn.addEventListener('click', () => {
-      controlsPanel.classList.toggle('hidden');
-    });
-
-    // Fullscreen
+    togglePanelBtn.addEventListener('click', () => controlsPanel.classList.toggle('hidden'));
     fullscreenToggle.addEventListener('click', () => {
-      if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen().catch(err => console.log(err));
-      } else {
-        if (document.exitFullscreen) document.exitFullscreen();
-      }
+      if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(err => console.log(err));
+      else if (document.exitFullscreen) document.exitFullscreen();
     });
 
-    // Toggle-uri
     toggleShowCam.addEventListener('click', () => { showRealCam = !showRealCam; updateUIState(); saveState(); });
     toggleAiCut.addEventListener('click', () => { isAiCutOn = !isAiCutOn; updateUIState(); saveState(); });
-    toggleBodyTrack.addEventListener('click', () => { isBodyTrackOn = !isBodyTrackOn; updateUIState(); saveState(); });
     toggleMaskOnly.addEventListener('click', () => { isMaskOnly = !isMaskOnly; updateUIState(); saveState(); });
     toggleFlipH.addEventListener('click', () => { flipH = !flipH; saveState(); });
-    toggleFlipV.addEventListener('click', () => { flipV = !flipV; saveState(); });
-
-    // Upload & Gestionare Fișiere
-    bgUploader.addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = (evt) => {
-          const res = evt.target.result;
-          savedBgs.push({ data: res, type: file.type.startsWith('video') ? 'video' : 'image' });
-          renderGalleries();
-          selectBg(res, file.type.startsWith('video') ? 'video' : 'image');
-        };
-        reader.readAsDataURL(file);
-      }
-    });
-
-    avatarUploader.addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = (evt) => {
-          savedAvatars.push(evt.target.result);
-          renderGalleries();
-          selectAvatar(evt.target.result);
-        };
-        reader.readAsDataURL(file);
-      }
-    });
-
-    function selectBg(src, type) {
-      activeBgType = type;
-      if (type === 'video') {
-        bgVideoElement.src = src;
-        bgVideoElement.play();
-      } else {
-        bgVideoElement.pause();
-        const img = new Image();
-        img.src = src;
-        img.onload = () => { activeBgImg = img; };
-      }
-    }
-
-    function selectAvatar(src) {
-      const img = new Image();
-      img.src = src;
-      img.onload = () => { activeAvatarImg = img; };
-    }
-
-    function renderGalleries() {
-      try {
-        localStorage.setItem('vtuber_bgs_v25', JSON.stringify(savedBgs));
-        localStorage.setItem('vtuber_avatars_v25', JSON.stringify(savedAvatars));
-      } catch(e) {
-        console.warn("Memorie plină la salvarea fișierelor.");
-      }
-
-      bgGallery.innerHTML = '';
-      savedBgs.forEach(item => {
-        const bgSrc = typeof item === 'string' ? item : item.data;
-        const bgType = typeof item === 'string' ? 'image' : item.type;
-        const el = document.createElement(bgType === 'video' ? 'video' : 'img');
-        el.src = bgSrc;
-        el.className = 'gallery-item';
-        el.onclick = () => selectBg(bgSrc, bgType);
-        bgGallery.appendChild(el);
-      });
-
-      avatarGallery.innerHTML = '';
-      savedAvatars.forEach(src => {
-        const img = document.createElement('img');
-        img.src = src;
-        img.className = 'gallery-item';
-        img.onclick = () => selectAvatar(src);
-        avatarGallery.appendChild(img);
-      });
-    }
-
-    // Înregistrare MP4 cu Audio (Microfon) & Auto Download
-    quickRecordBtn.addEventListener('click', () => {
-      if (!isRecording) startRecording();
-      else stopRecording();
-    });
-
-    async function startRecording() {
-      recordedChunks = [];
-      const canvasStream = canvasElement.captureStream(30);
-      let combinedStream = canvasStream;
-
-      // Adăugare pista audio de la microfon (dacă există permisiune)
-      try {
-        const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const audioTrack = audioStream.getAudioTracks()[0];
-        combinedStream = new MediaStream([...canvasStream.getVideoTracks(), audioTrack]);
-      } catch (err) {
-        console.log("Fără captură microfon: ", err);
-      }
-
-      let options = { mimeType: 'video/webm;codecs=vp9' };
-      if (!MediaRecorder.isTypeSupported(options.mimeType)) options = { mimeType: 'video/webm' };
-      
-      try { mediaRecorder = new MediaRecorder(combinedStream, options); } 
-      catch (e) { mediaRecorder = new MediaRecorder(combinedStream); }
-
-      mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
-      mediaRecorder.onstop = () => {
-        const blob = new Blob(recordedChunks, { type: 'video/mp4' });
-        const url = URL.createObjectURL(blob);
-        downloadVideo(url);
-      };
-
-      mediaRecorder.start();
-      isRecording = true;
-      quickRecordBtn.classList.add('recording');
-      quickRecordBtn.innerText = '⏹';
-    }
-
-    function stopRecording() {
-      mediaRecorder.stop();
-      isRecording = false;
-      quickRecordBtn.classList.remove('recording');
-      quickRecordBtn.innerText = '⏺';
-    }
-
-    function downloadVideo(url) {
-      const a = document.createElement('a');
-      a.style.display = 'none';
-      a.href = url;
-      a.download = `VTuber_Record_${Date.now()}.mp4`;
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(() => {
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-      }, 100);
-    }
-
-    // Setup MediaPipe
-    let latestFaceResults = null;
-    let latestPoseResults = null;
-    let latestSegmentationResults = null;
-
-    const faceMesh = new FaceMesh({
-      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
-    });
-    faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
-    faceMesh.onResults((results) => { latestFaceResults = results; });
-
-    const pose = new Pose({
-      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
-    });
-    pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
-    pose.onResults((results) => { latestPoseResults = results; });
-
-    const selfieSegmentation = new SelfieSegmentation({
-      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`
-    });
-    selfieSegmentation.setOptions({ modelSelection: 1 });
-    selfieSegmentation.onResults((results) => { latestSegmentationResults = results; });
-
-    // Desenează Scena
-    function drawScene() {
-      canvasElement.width = window.innerWidth;
-      canvasElement.height = window.innerHeight;
-      const w = canvasElement.width;
-      const h = canvasElement.height;
-
-      canvasCtx.save();
-      canvasCtx.clearRect(0, 0, w, h);
-
-      // Oglindire H/V
-      canvasCtx.translate(flipH ? w : 0, flipV ? h : 0);
-      canvasCtx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
-
-      // 1. Randare Fundal Foto/Video
-      if (activeBgType === 'image' && activeBgImg) {
-        canvasCtx.drawImage(activeBgImg, 0, 0, w, h);
-      } else if (activeBgType === 'video' && bgVideoElement.readyState >= 2) {
-        canvasCtx.drawImage(bgVideoElement, 0, 0, w, h);
-      }
-
-      // 2. Randare Cam Reală / Crop AI
-      if (showRealCam && videoElement.readyState >= 2) {
-        if (isAiCutOn && latestSegmentationResults) {
-          canvasCtx.save();
-          canvasCtx.drawImage(latestSegmentationResults.segmentationMask, 0, 0, w, h);
-          canvasCtx.globalCompositeOperation = 'source-in';
-          canvasCtx.drawImage(videoElement, 0, 0, w, h);
-          canvasCtx.restore();
-        } else {
-          canvasCtx.drawImage(videoElement, 0, 0, w, h);
-        }
-      }
-
-      // 3. Mască Avatar Față
-      if (latestFaceResults && latestFaceResults.multiFaceLandmarks.length > 0) {
-        statusEl.innerText = "Tracking Activ";
-        const landmarks = latestFaceResults.multiFaceLandmarks[0];
-
-        const nose = landmarks[1];
-        const headX = nose.x * w + parseFloat(offsetXSlider.value);
-        const headY = nose.y * h + parseFloat(offsetYSlider.value);
-
-        const scaleW = parseFloat(scaleWidthSlider.value);
-        const scaleH = parseFloat(scaleHeightSlider.value);
-        const rot = parseFloat(rotationSlider.value) * Math.PI / 180;
-
-        if (activeAvatarImg && isMaskOnly) {
-          canvasCtx.save();
-          canvasCtx.translate(headX, headY);
-          canvasCtx.rotate(rot);
-          const avW = activeAvatarImg.width * scaleW;
-          const avH = activeAvatarImg.height * scaleH;
-          canvasCtx.drawImage(activeAvatarImg, -avW / 2, -avH / 2, avW, avH);
-          canvasCtx.restore();
-        }
-
-      } else {
-        statusEl.innerText = "Căutare față...";
-      }
-
-      canvasCtx.restore();
-    }
-
-    // Inițializare Cameră
-    async function initCamera() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: 1280, height: 720, facingMode: 'user' },
-          audio: false
-        });
-        videoElement.srcObject = stream;
-        await videoElement.play();
-
-        const camera = new Camera(videoElement, {
-          onFrame: async () => {
-            if (isAiCutOn || showRealCam) {
-              await selfieSegmentation.send({ image: videoElement });
-            }
-            if (isBodyTrackOn) {
-              await pose.send({ image: videoElement });
-            }
-            await faceMesh.send({ image: videoElement });
-          },
-          width: 640,
-          height: 480
-        });
-        camera.start();
-
-        function renderLoop() {
-          drawScene();
-          requestAnimationFrame(renderLoop);
-        }
-        renderLoop();
-
-      } catch(err) {
-        statusEl.innerText = "Eroare la pornirea camerei!";
-        console.error(err);
-      }
-    }
-
-    window.addEventListener('DOMContentLoaded', () => {
-      loadState();
-      renderGalleries();
-      if (savedBgs.length > 0) {
-        const firstBg = savedBgs[0];
-        selectBg(typeof firstBg === 'string' ? firstBg : firstBg.data, typeof firstBg === 'string' ? 'image' : firstBg.type);
-      }
-      if (savedAvatars.length > 0) selectAvatar(savedAvatars[0]);
-      initCamera();
-    });
-  </script>
-</body>
-</html>
+    
