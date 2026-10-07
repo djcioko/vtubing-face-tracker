@@ -3,197 +3,224 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Rigging Torso - Cadru Unic cu 6 Puncte</title>
+  <title>Studio Mapper V40 - Single Video 8 Points</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body {
+    body, html {
       width: 100vw; height: 100vh; overflow: hidden;
-      background-color: #08080c;
+      background-color: #0d0d13; color: #fff;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
-    #container { position: relative; width: 100vw; height: 100vh; }
-    #webcam, #output_canvas, #bg-video {
-      position: absolute; top: 0; left: 0;
-      width: 100vw; height: 100vh; object-fit: cover;
-    }
-    #webcam, #bg-video { display: none; }
-    #output_canvas { z-index: 2; transform: scaleX(-1); cursor: crosshair; }
 
-    #ui-toggle-btn {
-      position: absolute; top: 15px; right: 15px; z-index: 100;
-      background: rgba(0, 255, 204, 0.2); border: 1px solid #00ffcc;
-      color: #00ffcc; padding: 8px 14px; font-size: 12px; font-weight: bold;
-      border-radius: 8px; cursor: pointer; backdrop-filter: blur(5px);
+    #device-switcher {
+      position: absolute; top: 12px; left: 12px; z-index: 20;
+      display: flex; gap: 8px; align-items: center;
+      background: rgba(15, 15, 25, 0.85); padding: 8px 12px;
+      border-radius: 8px; border: 1px solid rgba(0, 255, 204, 0.3);
+      backdrop-filter: blur(8px);
     }
-    #ui-toggle-btn:hover { background: rgba(0, 255, 204, 0.4); }
+    .mode-btn {
+      background: rgba(255, 255, 255, 0.1); color: #fff; border: 1px solid rgba(255, 255, 255, 0.2);
+      padding: 6px 10px; font-size: 11px; font-weight: bold; border-radius: 6px; cursor: pointer;
+    }
+    .mode-btn:hover { background: rgba(0, 255, 204, 0.3); border-color: #00ffcc; color: #00ffcc; }
+    #res-indicator { font-size: 11px; font-weight: bold; color: #00ffcc; margin-left: 8px; }
 
-    #ui-overlay {
-      position: absolute; top: 15px; left: 15px; z-index: 10;
-      display: flex; flex-direction: column; gap: 10px; width: 360px;
-      max-height: 92vh; overflow-y: auto;
-      background: rgba(15, 15, 25, 0.92); padding: 15px; border-radius: 12px;
-      border: 1px solid rgba(0, 255, 204, 0.3); backdrop-filter: blur(10px);
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+    #app-container {
+      width: 100vw; height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+      position: relative;
     }
-    #ui-overlay.hidden { display: none !important; }
-
-    .btn-main {
-      background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
-      color: #000; border: none; padding: 12px 16px; font-size: 14px;
-      font-weight: bold; border-radius: 8px; cursor: pointer;
-    }
-    .btn-main:hover { transform: scale(1.02); }
-
-    .btn-toggle {
-      background: rgba(255, 255, 255, 0.1); color: #fff;
-      border: 1px solid rgba(255, 255, 255, 0.2); padding: 6px 10px;
-      font-size: 11px; border-radius: 6px; cursor: pointer;
-    }
-    .btn-toggle.active {
-      background: rgba(0, 255, 204, 0.3); border-color: #00ffcc; color: #00ffcc; font-weight: bold;
+    canvas {
+      display: block; background: #000;
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
+      cursor: crosshair;
     }
 
-    .group {
-      display: flex; flex-direction: column; gap: 8px;
-      border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 10px;
+    #controls {
+      position: absolute; top: 60px; left: 12px; z-index: 20;
+      width: 280px; background: rgba(15, 15, 25, 0.9);
+      padding: 15px; border-radius: 10px; border: 1px solid rgba(0, 255, 204, 0.3);
+      backdrop-filter: blur(10px); display: flex; flex-direction: column; gap: 8px;
     }
-    .group label { color: #00ffcc; font-size: 11px; font-weight: bold; text-transform: uppercase; }
-    .file-input { color: #ccc; font-size: 11px; width: 100%; }
-    .row { display: flex; gap: 6px; flex-wrap: wrap; }
-    .scale-controls { display: flex; align-items: center; gap: 8px; color: #fff; font-size: 11px; }
-    .scale-controls input[type="range"] { flex: 1; }
-    #status { color: #00ffcc; font-size: 12px; font-weight: bold; }
+    #controls.hidden { display: none !important; }
+    #controls h3 { font-size: 14px; color: #00ffcc; margin-bottom: 5px; text-transform: uppercase; }
+    #controls label { font-size: 10px; font-weight: bold; color: #aaa; text-transform: uppercase; margin-top: 4px; }
+
+    .btn {
+      background: rgba(255, 255, 255, 0.08); color: #ccc;
+      border: 1px solid rgba(255, 255, 255, 0.15); padding: 8px;
+      font-size: 11px; border-radius: 6px; cursor: pointer; width: 100%;
+    }
+    .btn:hover { border-color: #00ffcc; color: #fff; }
+
+    #bottom-bar {
+      position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
+      z-index: 20; display: flex; gap: 10px;
+      background: rgba(15, 15, 25, 0.85); padding: 8px 16px;
+      border-radius: 20px; border: 1px solid rgba(0, 255, 204, 0.3);
+      backdrop-filter: blur(8px);
+    }
+    .b-btn {
+      background: transparent; color: #00ffcc; border: 1px solid #00ffcc;
+      padding: 6px 12px; font-size: 11px; font-weight: bold; border-radius: 12px; cursor: pointer;
+    }
+    .b-btn:hover { background: rgba(0, 255, 204, 0.2); }
   </style>
-
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/holistic/holistic.js" crossorigin="anonymous"></script>
 </head>
 <body>
 
-<div id="container">
-  <button id="ui-toggle-btn">👁️ Ascunde Meniul</button>
-
-  <div id="ui-overlay">
-    <button id="start-btn" class="btn-main">▶ Pornește Camera & Rigging</button>
-    <div id="status">Apasă start pentru pornire...</div>
-
-    <div class="group">
-      <label>Opțiuni Cadru (6 Puncte)</label>
-      <div class="row">
-        <button id="toggle-skeleton" class="btn-toggle active">Linii Cadru: ON</button>
-        <button id="toggle-hide-cam" class="btn-toggle">Camera: SHOW</button>
-        <button id="reset-offsets" class="btn-toggle" style="border-color:#ff0055; color:#ff3366;">Reset Cadru 6 Puncte</button>
-      </div>
+    <div id="device-switcher">
+        <button onclick="setView('desktop')" class="mode-btn">💻 DESKTOP</button>
+        <button onclick="setView('mobile')" class="mode-btn">📱 SMARTPHONE</button>
+        <div id="res-indicator">MOD: DESKTOP</div>
     </div>
 
-    <div class="group">
-      <label>Încărcare Imagine / Video Torso</label>
-      <input type="file" id="file-torso" accept="image/*,video/*" class="file-input">
+    <div id="app-container">
+        <canvas id="canvas"></canvas>
     </div>
 
-    <div class="group">
-      <label>Dimensiune Cadru Pe Verticală</label>
-      <div class="scale-controls">
-        <span>Înălțime Cadru:</span>
-        <input type="range" id="scale-torso-len" min="0.1" max="1.0" step="0.02" value="0.5">
-      </div>
+    <div id="controls">
+        <h3>Studio Mapper V40 - 8 Puncte Unic</h3>
+        <label>DECOR FUNDAL:</label>
+        <input type="file" id="bgInput" accept="image/*,video/*" class="btn">
+        
+        <label>FIȘIER VIDEO (PE CADRUL CU 8 PUNCTE):</label>
+        <input type="file" id="video1Input" accept="video/*,image/*" class="btn">
+        
+        <button class="btn" onclick="resetPoints()" style="margin-top:15px; border-color:#ff0055; color:#ff3366; font-weight:bold;">RESETARE CADRU 8 PUNCTE</button>
     </div>
-  </div>
 
-  <video id="webcam" autoplay playsinline muted></video>
-  <video id="bg-video" autoplay loop muted playsinline></video>
-  <canvas id="output_canvas"></canvas>
-</div>
+    <div id="bottom-bar">
+        <button class="b-btn" onclick="toggleDots()">DOTS: ON/OFF</button>
+        <button class="b-btn" onclick="toggleUI()">MENU: ON/OFF</button>
+        <button class="b-btn" onclick="toggleFullScreen()">FULL SCREEN</button>
+    </div>
+
+    <video id="vid1" loop muted playsinline crossorigin="anonymous" style="display:none"></video>
 
 <script>
-  const videoElement = document.getElementById('webcam');
-  const canvasElement = document.getElementById('output_canvas');
-  const canvasCtx = canvasElement.getContext('2d');
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const v1 = document.getElementById('vid1');
 
-  const startBtn = document.getElementById('start-btn');
-  const statusDiv = document.getElementById('status');
-  const resetBtn = document.getElementById('reset-offsets');
+let backgroundImg = new Image();
+let showUI = true;
+let showDots = true;
+let currentMode = 'desktop';
 
-  const uiOverlay = document.getElementById('ui-overlay');
-  const uiToggleBtn = document.getElementById('ui-toggle-btn');
-  let isUiVisible = true;
+// Structură UNICĂ cu EXACT 8 PUNCTE DE CONTROL pentru tot videoclipul
+// Punctele sunt dispuse în grilă 3x3 (fără centru):
+// 0: Sus-Stânga,   1: Sus-Mijloc,   2: Sus-Dreapta
+// 3: Mijloc-Stânga,                 4: Mijloc-Dreapta
+// 5: Jos-Stânga,    6: Jos-Mijloc,   7: Jos-Dreapta
+let singleLayer = {
+  pts: [
+    {x: 100, y: 100}, {x: 300, y: 100}, {x: 500, y: 100},
+    {x: 100, y: 300},                   {x: 500, y: 300},
+    {x: 100, y: 500}, {x: 300, y: 500}, {x: 500, y: 500}
+  ]
+};
 
-  uiToggleBtn.addEventListener('click', () => {
-    isUiVisible = !isUiVisible;
-    uiOverlay.classList.toggle('hidden', !isUiVisible);
-    uiToggleBtn.innerText = isUiVisible ? "👁️ Ascunde Meniul" : "👁️ Arată Meniul";
-  });
-
-  const toggleSkeletonBtn = document.getElementById('toggle-skeleton');
-  const toggleHideCamBtn = document.getElementById('toggle-hide-cam');
-  const inputTorso = document.getElementById('file-torso');
-  const sliderTorsoLen = document.getElementById('scale-torso-len');
-
-  let showSkeleton = localStorage.getItem('app_showSkeleton_6p') !== 'false';
-  let hideCamera = localStorage.getItem('app_hide_camera_6p') === 'true';
-
-  // Ștergem complet datele vechi de la 8 și 4 puncte pentru a nu bloca aplicația
-  localStorage.removeItem('app_torso_grid_offsets');
-  localStorage.removeItem('app_torso_offsets_4p');
-
-  // STRICT 6 PUNCTE (3 Sus: Stânga, Centru, Dreapta | 3 Jos: Stânga, Centru, Dreapta)
-  let torsoGridOffsets = JSON.parse(localStorage.getItem('app_torso_offsets_6p')) || [
-    {x:0, y:0}, {x:0, y:0}, {x:0, y:0},
-    {x:0, y:0}, {x:0, y:0}, {x:0, y:0}
-  ];
-
-  let torsoAsset = { type: null, element: null };
-  let draggingPointIndex = -1;
-  let currentTorsoPoints = [];
-
-  function updateToggleUI(btn, state, textPrefix) {
-    btn.classList.toggle('active', state);
-    btn.innerText = `${textPrefix}: ${state ? 'ON' : 'OFF'}`;
-  }
-
-  updateToggleUI(toggleSkeletonBtn, showSkeleton, 'Linii Cadru');
-  toggleHideCamBtn.innerText = `Camera: ${hideCamera ? 'HIDE' : 'SHOW'}`;
-  toggleHideCamBtn.classList.toggle('active', !hideCamera);
-
-  toggleSkeletonBtn.addEventListener('click', () => {
-    showSkeleton = !showSkeleton;
-    localStorage.setItem('app_showSkeleton_6p', showSkeleton);
-    updateToggleUI(toggleSkeletonBtn, showSkeleton, 'Linii Cadru');
-  });
-
-  toggleHideCamBtn.addEventListener('click', () => {
-    hideCamera = !hideCamera;
-    localStorage.setItem('app_hide_camera_6p', hideCamera);
-    toggleHideCamBtn.innerText = `Camera: ${hideCamera ? 'HIDE' : 'SHOW'}`;
-    toggleHideCamBtn.classList.toggle('active', !hideCamera);
-  });
-
-  resetBtn.addEventListener('click', () => {
-    torsoGridOffsets = [
-      {x:0, y:0}, {x:0, y:0}, {x:0, y:0},
-      {x:0, y:0}, {x:0, y:0}, {x:0, y:0}
-    ];
-    sliderTorsoLen.value = 0.5;
-    localStorage.setItem('app_torso_offsets_6p', JSON.stringify(torsoGridOffsets));
-  });
-
-  inputTorso.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const url = URL.createObjectURL(file);
-    if (file.type.startsWith('video/')) {
-      const v = document.createElement('video');
-      v.src = url; v.autoplay = true; v.loop = true; v.muted = true; v.playsInline = true;
-      v.play();
-      torsoAsset = { type: 'video', element: v };
-    } else {
-      const img = new Image();
-      img.src = url;
-      torsoAsset = { type: 'image', element: img };
+// Restaurare puncte salvate anterior
+const saved = localStorage.getItem('v40_single_8pts');
+if (saved) {
+  try {
+    const parsed = JSON.parse(saved);
+    if (parsed && parsed.length === 8) {
+      singleLayer.pts = parsed;
     }
-  });
+  } catch(e) {}
+}
 
-  function drawTriangleSubTexture(ctx, media, p0, p1, p2, u0, v0, u1, v1, u2, v2) {
+function setView(type) {
+    currentMode = type;
+    const resText = document.getElementById('res-indicator');
+    if (type === 'mobile') {
+        canvas.width = 390; canvas.height = 844;
+        canvas.style.width = '390px'; canvas.style.height = '844px';
+        resText.innerText = "MOD: SMARTPHONE (390x844)";
+    } else {
+        canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+        canvas.style.width = '100%'; canvas.style.height = '100%';
+        resText.innerText = "MOD: DESKTOP (FULL)";
+    }
+}
+
+function setupEvents() {
+    window.onresize = () => { if(currentMode === 'desktop') setView('desktop'); };
+    
+    document.getElementById('bgInput').onchange = (e) => { 
+        if(e.target.files[0]) backgroundImg.src = URL.createObjectURL(e.target.files[0]); 
+    };
+
+    document.getElementById('video1Input').onchange = (e) => { 
+        if(e.target.files[0]) { 
+            v1.src = URL.createObjectURL(e.target.files[0]); 
+            v1.play(); 
+        }
+    };
+
+    let dragPt = null;
+    let dragLayer = false;
+    let lastMouse = {x:0, y:0};
+
+    canvas.onmousedown = (e) => {
+        if(!showDots) return;
+        const rect = canvas.getBoundingClientRect();
+        const mouse = { 
+            x: (e.clientX - rect.left) * (canvas.width / rect.width), 
+            y: (e.clientY - rect.top) * (canvas.height / rect.height) 
+        };
+
+        dragPt = null;
+        dragLayer = false;
+
+        // Verificăm dacă s-a dat click pe unul din cele 8 puncte
+        singleLayer.pts.forEach(p => { 
+            if(Math.hypot(p.x - mouse.x, p.y - mouse.y) < 30) dragPt = p; 
+        });
+
+        // Dacă nu s-a atins niciun punct, permitem mutarea întregului cadru
+        if(!dragPt) {
+            const minX = Math.min(...singleLayer.pts.map(p => p.x));
+            const maxX = Math.max(...singleLayer.pts.map(p => p.x));
+            const minY = Math.min(...singleLayer.pts.map(p => p.y));
+            const maxY = Math.max(...singleLayer.pts.map(p => p.y));
+
+            if(mouse.x > minX && mouse.x < maxX && mouse.y > minY && mouse.y < maxY) {
+                dragLayer = true;
+            }
+        }
+        lastMouse = mouse;
+    };
+
+    window.onmousemove = (e) => {
+        if(!dragPt && !dragLayer) return;
+        const rect = canvas.getBoundingClientRect();
+        const mouse = { 
+            x: (e.clientX - rect.left) * (canvas.width / rect.width), 
+            y: (e.clientY - rect.top) * (canvas.height / rect.height) 
+        };
+        const dx = mouse.x - lastMouse.x;
+        const dy = mouse.y - lastMouse.y;
+
+        if(dragPt) { 
+            dragPt.x = mouse.x; 
+            dragPt.y = mouse.y; 
+        } else if(dragLayer) { 
+            singleLayer.pts.forEach(p => { p.x += dx; p.y += dy; }); 
+        }
+
+        lastMouse = mouse;
+        localStorage.setItem('v40_single_8pts', JSON.stringify(singleLayer.pts));
+    };
+
+    window.onmouseup = () => { dragPt = null; dragLayer = false; };
+}
+
+// Funcție matematică pentru a desena o bucată din clipul video deformata (pe un triunghi)
+function drawSubTexture(media, p0, p1, p2, u0, v0, u1, v1, u2, v2) {
     const w = media.videoWidth || media.width || 1;
     const h = media.videoHeight || media.height || 1;
 
@@ -205,19 +232,11 @@
     ctx.closePath();
     ctx.clip();
 
-    const x0 = p0.x, y0 = p0.y;
-    const x1 = p1.x, y1 = p1.y;
-    const x2 = p2.x, y2 = p2.y;
-
-    const sx0 = u0 * w, sy0 = v0 * h;
-    const sx1 = u1 * w, sy1 = v1 * h;
-    const sx2 = u2 * w, sy2 = v2 * h;
+    const x0 = p0.x, y0 = p0.y, x1 = p1.x, y1 = p1.y, x2 = p2.x, y2 = p2.y;
+    const sx0 = u0 * w, sy0 = v0 * h, sx1 = u1 * w, sy1 = v1 * h, sx2 = u2 * w, sy2 = v2 * h;
 
     const denom = (sx0 * (sy1 - sy2) + sx1 * (sy2 - sy0) + sx2 * (sy0 - sy1));
-    if (Math.abs(denom) < 1e-5) {
-      ctx.restore();
-      return;
-    }
+    if (Math.abs(denom) < 1e-5) { ctx.restore(); return; }
 
     const a = (x0 * (sy1 - sy2) + x1 * (sy2 - sy0) + x2 * (sy0 - sy1)) / denom;
     const c = (x0 * (sx2 - sx1) + x1 * (sx0 - sx2) + x2 * (sx1 - sx0)) / denom;
@@ -230,189 +249,91 @@
     ctx.transform(a, b, c, d, e, f);
     ctx.drawImage(media, 0, 0, w, h);
     ctx.restore();
-  }
+}
 
-  // Randare imagine deformata pe grila de 6 puncte (4 triunghiuri)
-  function draw6PointWarpedMesh(ctx, asset, pts) {
-    if (!asset || !asset.element || pts.length < 6) return;
-    const elem = asset.element;
+// Mapează TOT VIDEOCLIPUL pe cele 8 PUNCTE împărțind cadrul în 6 triunghiuri
+function render8PointWarp(media, pts) {
+    const [p0, p1, p2, p3, p4, p5, p6, p7] = pts;
 
-    const [p0, p1, p2, p3, p4, p5] = pts;
+    // Sector Stânga-Sus
+    drawSubTexture(media, p0, p1, p3, 0, 0,  0.5, 0,  0, 0.5);
+    drawSubTexture(media, p1, p4, p3, 0.5, 0, 0.5, 0.5, 0, 0.5);
 
-    // Triunghi 1: Sus-Stânga
-    drawTriangleSubTexture(ctx, elem, p0, p1, p3, 0, 0, 0.5, 0, 0, 1);
-    // Triunghi 2: Jos-Stânga
-    drawTriangleSubTexture(ctx, elem, p1, p4, p3, 0.5, 0, 0.5, 1, 0, 1);
-    // Triunghi 3: Sus-Dreapta
-    drawTriangleSubTexture(ctx, elem, p1, p2, p4, 0.5, 0, 1, 0, 0.5, 1);
-    // Triunghi 4: Jos-Dreapta
-    drawTriangleSubTexture(ctx, elem, p2, p5, p4, 1, 0, 1, 1, 0.5, 1);
-  }
+    // Sector Dreapta-Sus
+    drawSubTexture(media, p1, p2, p4, 0.5, 0, 1, 0,  0.5, 0.5);
+    drawSubTexture(media, p2, p7, p4, 1, 0,   1, 0.5, 0.5, 0.5);
 
-  function getCanvasCoords(e) {
-    const rect = canvasElement.getBoundingClientRect();
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    // Sector Stânga-Jos
+    drawSubTexture(media, p3, p4, p5, 0, 0.5, 0.5, 0.5, 0, 1);
+    drawSubTexture(media, p4, p6, p5, 0.5, 0.5, 0.5, 1, 0, 1);
+
+    // Sector Dreapta-Jos
+    drawSubTexture(media, p4, p7, p6, 0.5, 0.5, 1, 0.5, 0.5, 1);
+    drawSubTexture(media, p7, p7, p6, 1, 0.5,   1, 1,   0.5, 1);
+}
+
+function animate() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    const xRaw = clientX - rect.left;
-    const y = clientY - rect.top;
-    const x = rect.width - xRaw; 
-    return { x, y };
-  }
-
-  function handleStart(e) {
-    const pos = getCanvasCoords(e);
-    if (currentTorsoPoints.length === 6) {
-      for (let i = 0; i < currentTorsoPoints.length; i++) {
-        const pt = currentTorsoPoints[i];
-        const dist = Math.hypot(pt.x - pos.x, pt.y - pos.y);
-        if (dist < 25) {
-          draggingPointIndex = i;
-          return;
-        }
-      }
+    if(backgroundImg.src) {
+        ctx.drawImage(backgroundImg, 0, 0, canvas.width, canvas.height);
     }
-  }
-
-  function handleMove(e) {
-    if (draggingPointIndex !== -1) {
-      const pos = getCanvasCoords(e);
-      torsoGridOffsets[draggingPointIndex].x += pos.x - currentTorsoPoints[draggingPointIndex].x;
-      torsoGridOffsets[draggingPointIndex].y += pos.y - currentTorsoPoints[draggingPointIndex].y;
-      localStorage.setItem('app_torso_offsets_6p', JSON.stringify(torsoGridOffsets));
+    
+    // Mapează videoclipul pe cele 8 puncte ale cadrului unic
+    if(v1.readyState >= 2) {
+        render8PointWarp(v1, singleLayer.pts);
     }
-  }
-
-  function handleEnd() {
-    draggingPointIndex = -1;
-  }
-
-  canvasElement.addEventListener('mousedown', handleStart);
-  canvasElement.addEventListener('mousemove', handleMove);
-  window.addEventListener('mouseup', handleEnd);
-
-  canvasElement.addEventListener('touchstart', handleStart);
-  canvasElement.addEventListener('touchmove', handleMove);
-  window.addEventListener('touchend', handleEnd);
-
-  function onResults(results) {
-    canvasCtx.save();
-    canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-
-    if (!hideCamera && results.image) {
-      canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
-    }
-
-    if (results.poseLandmarks) {
-      const lm = results.poseLandmarks;
-      const w = canvasElement.width;
-      const h = canvasElement.height;
-
-      const lShoulder = { x: lm[11].x * w, y: lm[11].y * h };
-      const rShoulder = { x: lm[12].x * w, y: lm[12].y * h };
-      
-      const factor = parseFloat(sliderTorsoLen.value);
-
-      const lHipRaw = { x: lm[23].x * w, y: lm[23].y * h };
-      const rHipRaw = { x: lm[24].x * w, y: lm[24].y * h };
-
-      const lHip = {
-        x: lShoulder.x + (lHipRaw.x - lShoulder.x) * factor,
-        y: lShoulder.y + (lHipRaw.y - lShoulder.y) * factor
-      };
-      const rHip = {
-        x: rShoulder.x + (rHipRaw.x - rShoulder.x) * factor,
-        y: rShoulder.y + (rHipRaw.y - rShoulder.y) * factor
-      };
-
-      // Calcul puncte de mijloc pentru linia de sus și linia de jos
-      const topMid = { x: (lShoulder.x + rShoulder.x) / 2, y: (lShoulder.y + rShoulder.y) / 2 };
-      const botMid = { x: (lHip.x + rHip.x) / 2, y: (lHip.y + rHip.y) / 2 };
-
-      // Cele 6 puncte de baza
-      const gridBase = [
-        lShoulder, topMid, rShoulder,
-        lHip,      botMid, rHip
-      ];
-
-      currentTorsoPoints = gridBase.map((pt, idx) => ({
-        x: pt.x + torsoGridOffsets[idx].x,
-        y: pt.y + torsoGridOffsets[idx].y
-      }));
-
-      // Deseneaza imaginea/clipul pe cele 6 puncte
-      draw6PointWarpedMesh(canvasCtx, torsoAsset, currentTorsoPoints);
-
-      // Deseneaza Liniile de Ghidaj si cele 6 CERCURI DE CONTROL
-      if (showSkeleton) {
-        canvasCtx.strokeStyle = '#00ffcc';
-        canvasCtx.lineWidth = 2;
+    
+    // Desenează punctele de control pe ecran
+    if(showDots) {
+        // Linii de ghidaj între puncte
+        ctx.strokeStyle = 'rgba(0, 255, 204, 0.4)';
+        ctx.lineWidth = 1.5;
+        const p = singleLayer.pts;
         
-        const [p0, p1, p2, p3, p4, p5] = currentTorsoPoints;
-
+        ctx.beginPath();
         // Contur exterior
-        canvasCtx.beginPath();
-        canvasCtx.moveTo(p0.x, p0.y);
-        canvasCtx.lineTo(p1.x, p1.y);
-        canvasCtx.lineTo(p2.x, p2.y);
-        canvasCtx.lineTo(p5.x, p5.y);
-        canvasCtx.lineTo(p4.x, p4.y);
-        canvasCtx.lineTo(p3.x, p3.y);
-        canvasCtx.closePath();
-        canvasCtx.stroke();
+        ctx.moveTo(p[0].x, p[0].y); ctx.lineTo(p[1].x, p[1].y); ctx.lineTo(p[2].x, p[2].y);
+        ctx.lineTo(p[4].x, p[4].y); ctx.lineTo(p[7].x, p[7].y); ctx.lineTo(p[6].x, p[6].y);
+        ctx.lineTo(p[5].x, p[5].y); ctx.lineTo(p[3].x, p[3].y); ctx.closePath();
+        // Linii interioare
+        ctx.moveTo(p[1].x, p[1].y); ctx.lineTo(p[6].x, p[6].y);
+        ctx.moveTo(p[3].x, p[3].y); ctx.lineTo(p[4].x, p[4].y);
+        ctx.stroke();
 
-        // Linie de divizare la mijloc
-        canvasCtx.beginPath();
-        canvasCtx.moveTo(p1.x, p1.y);
-        canvasCtx.lineTo(p4.x, p4.y);
-        canvasCtx.stroke();
-
-        // Deseneaza fix cele 6 cercuri de lucru
-        currentTorsoPoints.forEach((pt, idx) => {
-          canvasCtx.fillStyle = (idx === 1 || idx === 4) ? '#ff0055' : '#ffffff';
-          canvasCtx.beginPath();
-          canvasCtx.arc(pt.x, pt.y, 8, 0, Math.PI * 2);
-          canvasCtx.fill();
-          canvasCtx.strokeStyle = '#00ffcc';
-          canvasCtx.stroke();
+        // Cercuri pentru cele 8 puncte de control
+        p.forEach((pt, idx) => { 
+            ctx.fillStyle = (idx === 1 || idx === 6 || idx === 3 || idx === 4) ? '#ff0055' : '#00ffff'; 
+            ctx.beginPath(); 
+            ctx.arc(pt.x, pt.y, 8, 0, Math.PI*2); 
+            ctx.fill(); 
+            ctx.strokeStyle = '#fff';
+            ctx.stroke();
         });
-      }
     }
+    requestAnimationFrame(animate);
+}
 
-    canvasCtx.restore();
-  }
+function toggleUI() { 
+    showUI = !showUI; 
+    document.getElementById('controls').classList.toggle('hidden', !showUI); 
+}
 
-  let camera = null;
-  const holistic = new Holistic({
-    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/holistic/${file}`
-  });
+function toggleDots() { showDots = !showDots; }
 
-  holistic.setOptions({
-    modelComplexity: 1,
-    smoothLandmarks: true,
-    enableSegmentation: false
-  });
+function toggleFullScreen() { 
+    if(!document.fullscreenElement) document.documentElement.requestFullscreen(); 
+    else document.exitFullscreen(); 
+}
 
-  holistic.onResults(onResults);
+function resetPoints() { 
+    localStorage.removeItem('v40_single_8pts'); 
+    location.reload(); 
+}
 
-  startBtn.addEventListener('click', () => {
-    startBtn.disabled = true;
-    statusDiv.innerText = "Se inițializează camera...";
-
-    camera = new Camera(videoElement, {
-      onFrame: async () => {
-        canvasElement.width = videoElement.videoWidth || window.innerWidth;
-        canvasElement.height = videoElement.videoHeight || window.innerHeight;
-        await holistic.send({ image: videoElement });
-      },
-      width: 1280,
-      height: 720
-    });
-
-    camera.start().then(() => {
-      statusDiv.innerText = "Gata! Cadru unic cu 6 puncte active.";
-    });
-  });
+setupEvents(); 
+setView('desktop'); 
+animate();
 </script>
 </body>
 </html>
