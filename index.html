@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Torso Mapper - 4 Puncte Drag&Drop</title>
+  <title>3D Maparereala V1 - Single Video 8 Points</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body, html {
       width: 100vw; height: 100vh; overflow: hidden;
-      background-color: #08080c; color: #fff;
+      background-color: #050508; color: #fff;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
 
@@ -21,35 +21,38 @@
       background: #000; cursor: crosshair;
     }
 
-    #upload-container {
+    #top-bar {
       position: absolute; top: 15px; left: 15px; z-index: 10;
-      background: rgba(15, 15, 25, 0.85); padding: 10px 14px;
-      border-radius: 8px; border: 1px solid rgba(0, 255, 204, 0.3);
-      backdrop-filter: blur(8px); display: flex; align-items: center; gap: 10px;
+      background: rgba(10, 10, 20, 0.88); padding: 12px 16px;
+      border-radius: 10px; border: 1px solid rgba(0, 255, 204, 0.4);
+      backdrop-filter: blur(10px); display: flex; align-items: center; gap: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
     }
 
-    #upload-container label {
+    #top-bar label {
       font-size: 11px; font-weight: bold; color: #00ffcc; text-transform: uppercase;
     }
 
-    .file-btn {
-      color: #ccc; font-size: 11px;
-    }
+    .file-input { color: #ddd; font-size: 11px; cursor: pointer; }
 
-    #reset-btn {
-      background: transparent; color: #ff3366; border: 1px solid #ff3366;
-      padding: 4px 8px; font-size: 10px; border-radius: 4px; cursor: pointer;
+    .btn-action {
+      background: rgba(255, 255, 255, 0.1); color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.2); padding: 5px 10px;
+      font-size: 11px; border-radius: 6px; cursor: pointer; font-weight: bold;
     }
-    #reset-btn:hover { background: rgba(255, 51, 102, 0.2); }
+    .btn-action:hover { background: rgba(0, 255, 204, 0.2); border-color: #00ffcc; color: #00ffcc; }
+    .btn-reset { border-color: #ff3366; color: #ff3366; }
+    .btn-reset:hover { background: rgba(255, 51, 102, 0.2); }
   </style>
 </head>
 <body>
 
 <div id="app-container">
-  <div id="upload-container">
-    <label>Incarca Video Torso:</label>
-    <input type="file" id="videoInput" accept="video/*,image/*" class="file-btn">
-    <button id="reset-btn">Resetare Poziție</button>
+  <div id="top-bar">
+    <label>3D MAPAREREALA:</label>
+    <input type="file" id="videoInput" accept="video/*,image/*" class="file-input">
+    <button id="toggle-grid" class="btn-action">Puncte: ON</button>
+    <button id="reset-btn" class="btn-action btn-reset">Resetare Grilă 8P</button>
   </div>
 
   <canvas id="canvas"></canvas>
@@ -63,6 +66,9 @@
   const videoElem = document.getElementById('vid');
   const videoInput = document.getElementById('videoInput');
   const resetBtn = document.getElementById('reset-btn');
+  const toggleGridBtn = document.getElementById('toggle-grid');
+
+  let showGrid = true;
 
   function resizeCanvas() {
     canvas.width = window.innerWidth;
@@ -71,28 +77,35 @@
   window.addEventListener('resize', resizeCanvas);
   resizeCanvas();
 
-  // STRICT 4 COLȚURI (Sus-Stânga, Sus-Dreapta, Jos-Dreapta, Jos-Stânga)
-  let defaultPts = [
-    { x: canvas.width * 0.35, y: canvas.height * 0.2 }, // 0: Top-Left
-    { x: canvas.width * 0.65, y: canvas.height * 0.2 }, // 1: Top-Right
-    { x: canvas.width * 0.65, y: canvas.height * 0.8 }, // 2: Bottom-Right
-    { x: canvas.width * 0.35, y: canvas.height * 0.8 }  // 3: Bottom-Left
-  ];
+  // Matricea de 8 puncte pentru un singur videoclip (3 Sus, 2 Mijloc, 3 Jos)
+  // Indexuri:
+  // 0: Sus-Stânga,   1: Sus-Mijloc,   2: Sus-Dreapta
+  // 3: Mijloc-Stânga,                 4: Mijloc-Dreapta
+  // 5: Jos-Stânga,    6: Jos-Mijloc,   7: Jos-Dreapta
+  function getDefaultPoints() {
+    const w = canvas.width;
+    const h = canvas.height;
+    return [
+      { x: w * 0.30, y: h * 0.20 }, { x: w * 0.50, y: h * 0.20 }, { x: w * 0.70, y: h * 0.20 },
+      { x: w * 0.30, y: h * 0.50 },                               { x: w * 0.70, y: h * 0.50 },
+      { x: w * 0.30, y: h * 0.80 }, { x: w * 0.50, y: h * 0.80 }, { x: w * 0.70, y: h * 0.80 }
+    ];
+  }
 
-  let pts = JSON.parse(localStorage.getItem('app_torso_4pts')) || defaultPts;
+  let pts = JSON.parse(localStorage.getItem('3d_maparereala_config')) || getDefaultPoints();
 
-  function savePoints() {
-    localStorage.setItem('app_torso_4pts', JSON.stringify(pts));
+  function saveConfig() {
+    localStorage.setItem('3d_maparereala_config', JSON.stringify(pts));
   }
 
   resetBtn.addEventListener('click', () => {
-    pts = [
-      { x: canvas.width * 0.35, y: canvas.height * 0.2 },
-      { x: canvas.width * 0.65, y: canvas.height * 0.2 },
-      { x: canvas.width * 0.65, y: canvas.height * 0.8 },
-      { x: canvas.width * 0.35, y: canvas.height * 0.8 }
-    ];
-    savePoints();
+    pts = getDefaultPoints();
+    saveConfig();
+  });
+
+  toggleGridBtn.addEventListener('click', () => {
+    showGrid = !showGrid;
+    toggleGridBtn.innerText = `Puncte: ${showGrid ? 'ON' : 'OFF'}`;
   });
 
   videoInput.addEventListener('change', (e) => {
@@ -103,16 +116,15 @@
     }
   });
 
+  // Logica de Drag-and-Drop
   let dragPtIndex = -1;
   let isDraggingWholeFrame = false;
-  let lastMousePos = { x: 0, y: 0 };
+  let lastMouse = { x: 0, y: 0 };
 
-  function isPointInsidePolygon(point, vs) {
-    let x = point.x, y = point.y;
-    let inside = false;
+  function isPointInsidePolygon(p, vs) {
+    let x = p.x, y = p.y, inside = false;
     for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
-      let xi = vs[i].x, yi = vs[i].y;
-      let xj = vs[j].x, yj = vs[j].y;
+      let xi = vs[i].x, yi = vs[i].y, xj = vs[j].x, yj = vs[j].y;
       let intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
       if (intersect) inside = !inside;
     }
@@ -121,10 +133,7 @@
 
   function getMousePos(e) {
     const rect = canvas.getBoundingClientRect();
-    return {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top
-    };
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
   }
 
   canvas.addEventListener('mousedown', (e) => {
@@ -132,43 +141,40 @@
     dragPtIndex = -1;
     isDraggingWholeFrame = false;
 
-    // Verifică dacă ai dat click pe unul din cele 4 colțuri
-    for (let i = 0; i < pts.length; i++) {
-      if (Math.hypot(pts[i].x - mouse.x, pts[i].y - mouse.y) < 25) {
-        dragPtIndex = i;
-        break;
+    if (showGrid) {
+      for (let i = 0; i < pts.length; i++) {
+        if (Math.hypot(pts[i].x - mouse.x, pts[i].y - mouse.y) < 25) {
+          dragPtIndex = i;
+          break;
+        }
       }
     }
 
-    // Dacă nu s-a atins niciun colț, dar s-a dat click în interiorul cadrului -> mută tot cadrul
-    if (dragPtIndex === -1 && isPointInsidePolygon(mouse, pts)) {
+    // Contur poligonal format din punctele exterioare [0, 1, 2, 4, 7, 6, 5, 3]
+    const outerPoly = [pts[0], pts[1], pts[2], pts[4], pts[7], pts[6], pts[5], pts[3]];
+    if (dragPtIndex === -1 && isPointInsidePolygon(mouse, outerPoly)) {
       isDraggingWholeFrame = true;
     }
 
-    lastMousePos = mouse;
+    lastMouse = mouse;
   });
 
   window.addEventListener('mousemove', (e) => {
     if (dragPtIndex === -1 && !isDraggingWholeFrame) return;
 
     const mouse = getMousePos(e);
-    const dx = mouse.x - lastMousePos.x;
-    const dy = mouse.y - lastMousePos.y;
+    const dx = mouse.x - lastMouse.x;
+    const dy = mouse.y - lastMouse.y;
 
     if (dragPtIndex !== -1) {
-      // Modifică un singur colț
       pts[dragPtIndex].x = mouse.x;
       pts[dragPtIndex].y = mouse.y;
     } else if (isDraggingWholeFrame) {
-      // Mută tot cadrul sus/jos/stânga/dreapta
-      pts.forEach(p => {
-        p.x += dx;
-        p.y += dy;
-      });
+      pts.forEach(p => { p.x += dx; p.y += dy; });
     }
 
-    lastMousePos = mouse;
-    savePoints();
+    lastMouse = mouse;
+    saveConfig();
   });
 
   window.addEventListener('mouseup', () => {
@@ -176,8 +182,8 @@
     isDraggingWholeFrame = false;
   });
 
-  // Randare imagine deformată liber pe cele 4 colțuri (2 triunghiuri)
-  function drawTriangleSubTexture(media, p0, p1, p2, u0, v0, u1, v1, u2, v2) {
+  // Algoritm de mapare triunghiulara UV (Afișează corect portiunea de video pe 3 puncte)
+  function drawTriangleUV(media, p0, p1, p2, u0, v0, u1, v1, u2, v2) {
     const w = media.videoWidth || media.width || 1;
     const h = media.videoHeight || media.height || 1;
 
@@ -208,41 +214,60 @@
     ctx.restore();
   }
 
-  function render4PointWarp(media) {
-    // Triunghi 1: Sus-Stânga, Sus-Dreapta, Jos-Stânga
-    drawTriangleSubTexture(media, pts[0], pts[1], pts[3], 0, 0, 1, 0, 0, 1);
-    // Triunghi 2: Sus-Dreapta, Jos-Dreapta, Jos-Stânga
-    drawTriangleSubTexture(media, pts[1], pts[2], pts[3], 1, 0, 1, 1, 0, 1);
+  // Mapează UN SINGUR VIDEOCLIP complet pe cele 8 puncte (6 triunghiuri)
+  function renderSingleVideo8Points(media) {
+    const [p0, p1, p2, p3, p4, p5, p6, p7] = pts;
+
+    // Cadran 1: Stânga-Sus
+    drawTriangleUV(media, p0, p1, p3, 0, 0,    0.5, 0,   0, 0.5);
+    drawTriangleUV(media, p1, p4, p3, 0.5, 0,  0.5, 0.5, 0, 0.5);
+
+    // Cadran 2: Dreapta-Sus
+    drawTriangleUV(media, p1, p2, p4, 0.5, 0,  1, 0,     0.5, 0.5);
+    drawTriangleUV(media, p2, p7, p4, 1, 0,    1, 0.5,   0.5, 0.5);
+
+    // Cadran 3: Stânga-Jos
+    drawTriangleUV(media, p3, p4, p5, 0, 0.5,  0.5, 0.5, 0, 1);
+    drawTriangleUV(media, p4, p6, p5, 0.5, 0.5, 0.5, 1,  0, 1);
+
+    // Cadran 4: Dreapta-Jos
+    drawTriangleUV(media, p4, p7, p6, 0.5, 0.5, 1, 0.5,  0.5, 1);
+    drawTriangleUV(media, p7, p7, p6, 1, 0.5,  1, 1,     0.5, 1);
   }
 
   function render() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Daca videoclipul e incarcat, il randam pe cele 4 puncte
+    // Renderizează un singur videoclip pe grila completă
     if (videoElem.readyState >= 2) {
-      render4PointWarp(videoElem);
+      renderSingleVideo8Points(videoElem);
     }
 
-    // Desenează liniile cadrului
-    ctx.strokeStyle = '#00ffcc';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(pts[0].x, pts[0].y);
-    ctx.lineTo(pts[1].x, pts[1].y);
-    ctx.lineTo(pts[2].x, pts[2].y);
-    ctx.lineTo(pts[3].x, pts[3].y);
-    ctx.closePath();
-    ctx.stroke();
+    // Afișează grila și punctele de control
+    if (showGrid) {
+      ctx.strokeStyle = '#00ffcc';
+      ctx.lineWidth = 1.5;
 
-    // Desenează doar cele 4 cercuri din colțuri
-    pts.forEach((p) => {
-      ctx.fillStyle = '#00ffcc';
+      // Contur exterior & linii interioare
       ctx.beginPath();
-      ctx.arc(p.x, p.y, 8, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = '#ffffff';
+      ctx.moveTo(pts[0].x, pts[0].y); ctx.lineTo(pts[1].x, pts[1].y); ctx.lineTo(pts[2].x, pts[2].y);
+      ctx.lineTo(pts[4].x, pts[4].y); ctx.lineTo(pts[7].x, pts[7].y); ctx.lineTo(pts[6].x, pts[6].y);
+      ctx.lineTo(pts[5].x, pts[5].y); ctx.lineTo(pts[3].x, pts[3].y); ctx.closePath();
+      
+      ctx.moveTo(pts[1].x, pts[1].y); ctx.lineTo(pts[6].x, pts[6].y);
+      ctx.moveTo(pts[3].x, pts[3].y); ctx.lineTo(pts[4].x, pts[4].y);
       ctx.stroke();
-    });
+
+      // Cercurile celor 8 puncte
+      pts.forEach((p, idx) => {
+        ctx.fillStyle = (idx === 1 || idx === 6 || idx === 3 || idx === 4) ? '#ff0055' : '#00ffcc';
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.stroke();
+      });
+    }
 
     requestAnimationFrame(render);
   }
