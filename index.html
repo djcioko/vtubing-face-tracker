@@ -7,11 +7,34 @@
 
   <!-- MediaPipe CDNs -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js" crossorigin="anonymous"></script>
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: sans-serif; background: #121212; color: #fff; overflow: hidden; }
+    .canvas-container { position: relative; width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; }
+    canvas { width: 100%; height: 100%; object-fit: contain; }
+    #webcam { display: none; }
+    .controls-panel { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); padding: 15px; border-radius: 12px; display: flex; flex-direction: column; gap: 10px; max-width: 90%; max-height: 40vh; overflow-y: auto; z-index: 10; }
+    .btn-group { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+    .btn { padding: 8px 12px; border: none; border-radius: 6px; background: #333; color: white; cursor: pointer; font-size: 14px; }
+    .btn-full { width: 100%; }
+    .btn-record { background: #e63946; font-weight: bold; }
+    .btn-record.recording { background: #ff0000; animation: pulse 1s infinite; }
+    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+    .slider-group { display: flex; flex-direction: column; gap: 5px; font-size: 12px; }
+    #status { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.6); padding: 5px 10px; border-radius: 4px; font-size: 12px; }
+  </style>
 </head>
 <body>
 
+  <div id="status">Pornire aplicație...</div>
+
   <div class="canvas-container" id="canvasContainer">
     <video id="webcam" playsinline muted></video>
+    <canvas id="mainCanvas"></canvas>
   </div>
 
   <div class="controls-panel">
@@ -21,9 +44,52 @@
       <button id="toggleAiCut" class="btn">AI Cut-Off: OFF</button>
       <button id="toggleBodyTrack" class="btn">Urmărire Corp: OFF</button>
     </div>
+    <div class="slider-group">
+      <label>Lățime Avatar: <input type="range" id="scaleWidthSlider" min="0.1" max="3" step="0.1" value="1"></label>
+      <label>Înălțime Avatar: <input type="range" id="scaleHeightSlider" min="0.1" max="3" step="0.1" value="1"></label>
+      <label>Rotație: <input type="range" id="rotationSlider" min="-180" max="180" step="1" value="0"></label>
+      <label>Offset X: <input type="range" id="offsetXSlider" min="-200" max="200" step="1" value="0"></label>
+      <label>Offset Y: <input type="range" id="offsetYSlider" min="-200" max="200" step="1" value="0"></label>
+      <label>Gură X: <input type="range" id="mouthXSlider" min="-100" max="100" step="1" value="0"></label>
+      <label>Gură Y: <input type="range" id="mouthYSlider" min="-100" max="100" step="1" value="0"></label>
+      <label>Lățime Gură: <input type="range" id="mouthWidthSlider" min="0.1" max="3" step="0.1" value="1"></label>
+      <label>Sensibilitate Gură: <input type="range" id="mouthSensSlider" min="0.1" max="5" step="0.1" value="1"></label>
+    </div>
   </div>
 
   <script>
+    const videoElement = document.getElementById('webcam');
+    const canvasElement = document.getElementById('mainCanvas');
+    const canvasCtx = canvasElement.getContext('2d');
+    const statusEl = document.getElementById('status');
+
+    // Controale UI
+    const recordBtn = document.getElementById('recordBtn');
+    const toggleShowCam = document.getElementById('toggleShowCam');
+    const toggleAiCut = document.getElementById('toggleAiCut');
+    const toggleBodyTrack = document.getElementById('toggleBodyTrack');
+
+    const scaleWidthSlider = document.getElementById('scaleWidthSlider');
+    const scaleHeightSlider = document.getElementById('scaleHeightSlider');
+    const rotationSlider = document.getElementById('rotationSlider');
+    const offsetXSlider = document.getElementById('offsetXSlider');
+    const offsetYSlider = document.getElementById('offsetYSlider');
+    const mouthXSlider = document.getElementById('mouthXSlider');
+    const mouthYSlider = document.getElementById('mouthYSlider');
+    const mouthWidthSlider = document.getElementById('mouthWidthSlider');
+    const mouthSensSlider = document.getElementById('mouthSensSlider');
+
+    // Stări
+    let showRealCam = false;
+    let isAiCutOn = false;
+    let isBodyTrackOn = false;
+    let isRecording = false;
+    let mediaRecorder = null;
+    let recordedChunks = [];
+    let flipH = false;
+    let flipV = false;
+    let activeAvatar = null;
+
     let startTouchX = 0;
     let startTouchY = 0;
 
@@ -32,34 +98,87 @@
 
     const sliders = [scaleWidthSlider, scaleHeightSlider, rotationSlider, offsetXSlider, offsetYSlider, mouthXSlider, mouthYSlider, mouthWidthSlider, mouthSensSlider];
 
+    // Salvare & Încărcare Stare
     function saveState() {
       const state = {
-        activeAvatarIndex: savedAvatars.findIndex(a => activeAvatar && activeAvatar.src === a)
+        activeAvatarIndex: savedAvatars.findIndex(a => activeAvatar && activeAvatar.src === a),
+        flipH: flipH,
+        flipV: flipV
       };
-
       sliders.forEach(s => state[s.id] = s.value);
-
       localStorage.setItem('vtuber_app_state_v25', JSON.stringify(state));
     }
 
     function loadState() {
       const saved = JSON.parse(localStorage.getItem('vtuber_app_state_v25') || '{}');
-
       flipH = saved.flipH || false;
       flipV = saved.flipV || false;
+      sliders.forEach(s => {
+        if (saved[s.id] !== undefined) s.value = saved[s.id];
+      });
     }
 
-    // --- Înregistrare Video MP4 ---
+    sliders.forEach(s => s.addEventListener('input', saveState));
+
+    // Toggle-uri
+    toggleShowCam.addEventListener('click', () => {
+      showRealCam = !showRealCam;
+      toggleShowCam.innerText = `Camera Reală: ${showRealCam ? 'ON' : 'OFF'}`;
+    });
+    toggleAiCut.addEventListener('click', () => {
+      isAiCutOn = !isAiCutOn;
+      toggleAiCut.innerText = `AI Cut-Off: ${isAiCutOn ? 'ON' : 'OFF'}`;
+    });
+    toggleBodyTrack.addEventListener('click', () => {
+      isBodyTrackOn = !isBodyTrackOn;
+      toggleBodyTrack.innerText = `Urmărire Corp: ${isBodyTrackOn ? 'ON' : 'OFF'}`;
+    });
+
+    // Înregistrare Video MP4
     recordBtn.addEventListener('click', () => {
       if (!isRecording) {
         startRecording();
       } else {
-        mediaRecorder.stop();
-        isRecording = false;
-        recordBtn.classList.remove('recording');
-        recordBtn.innerText = '⏺ Începe Înregistrarea Video (MP4)';
+        stopRecording();
       }
     });
+
+    function startRecording() {
+      recordedChunks = [];
+      const stream = canvasElement.captureStream(30);
+      let options = { mimeType: 'video/webm;codecs=vp9' };
+      if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+        options = { mimeType: 'video/webm' };
+      }
+      
+      try {
+        mediaRecorder = new MediaRecorder(stream, options);
+      } catch (e) {
+        mediaRecorder = new MediaRecorder(stream);
+      }
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) recordedChunks.push(e.data);
+      };
+
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(recordedChunks, { type: 'video/mp4' });
+        const url = URL.createObjectURL(blob);
+        downloadVideo(url);
+      };
+
+      mediaRecorder.start();
+      isRecording = true;
+      recordBtn.classList.add('recording');
+      recordBtn.innerText = '⏹ Oprește Înregistrarea';
+    }
+
+    function stopRecording() {
+      mediaRecorder.stop();
+      isRecording = false;
+      recordBtn.classList.remove('recording');
+      recordBtn.innerText = '⏺ Începe Înregistrarea Video (MP4)';
+    }
 
     function downloadVideo(url) {
       const a = document.createElement('a');
@@ -83,23 +202,64 @@
       }
     }
 
+    // Configurare MediaPipe
+    let latestFaceResults = null;
+    let latestPoseResults = null;
+    let latestSegmentationResults = null;
+
+    const faceMesh = new FaceMesh({
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
+    });
     faceMesh.setOptions({
       maxNumFaces: 1,
       refineLandmarks: true,
       minDetectionConfidence: 0.5,
       minTrackingConfidence: 0.5
     });
-
-    faceMesh.onResults((results) => {
-      latestFaceResults = results;
-    });
+    faceMesh.onResults((results) => { latestFaceResults = results; });
 
     const pose = new Pose({
-      // configurare pose...
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
     });
+    pose.setOptions({
+      modelComplexity: 1,
+      smoothLandmarks: true,
+      minDetectionConfidence: 0.5,
+      minTrackingConfidence: 0.5
+    });
+    pose.onResults((results) => { latestPoseResults = results; });
 
+    const selfieSegmentation = new SelfieSegmentation({
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`
+    });
+    selfieSegmentation.setOptions({ modelSelection: 1 });
+    selfieSegmentation.onResults((results) => { latestSegmentationResults = results; });
+
+    // Render Scene
+    function drawScene() {
+      canvasElement.width = window.innerWidth;
+      canvasElement.height = window.innerHeight;
+      canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+
+      if (showRealCam && videoElement.readyState >= 2) {
+        canvasCtx.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
+      }
+
+      // Randare cadru VTuber pe canvas în funcție de landmarks
+      if (latestFaceResults && latestFaceResults.multiFaceLandmarks.length > 0) {
+        statusEl.innerText = "Tracking Activ (FaceMesh v2.5)";
+      } else {
+        statusEl.innerText = "Căutare față...";
+      }
+    }
+
+    // Pornire Cameră
     async function initCamera() {
       try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: 1280, height: 720, facingMode: 'user' },
+          audio: false
+        });
         videoElement.srcObject = stream;
         await videoElement.play();
 
@@ -113,8 +273,8 @@
             }
             await faceMesh.send({ image: videoElement });
           },
-          width: 500,
-          height: 500
+          width: 640,
+          height: 480
         });
         camera.start();
 
@@ -126,8 +286,15 @@
 
       } catch(err) {
         statusEl.innerText = "Eroare la pornirea camerei! Verificați permisiunile.";
+        console.error(err);
       }
     }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      loadState();
+      renderGalleries();
+      initCamera();
+    });
   </script>
 </body>
 </html>
